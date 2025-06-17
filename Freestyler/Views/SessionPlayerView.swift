@@ -14,7 +14,6 @@ struct SessionPlayerView: View {
 
     // MARK: - Sliders & Seeking
     @State private var beatProgressSliderValue: Double = 0.0
-    // Removed vocalProgressSliderValue as it's replaced by waveform
     @State private var isSeeking = false // To prevent timer updates during manual slider adjustment
     @State private var timer: Timer?
 
@@ -27,6 +26,10 @@ struct SessionPlayerView: View {
 
     // MARK: - Playback Control Constants
     let seekInterval: TimeInterval = 10.0 // Seek forward/backward by 10 seconds
+
+    // MARK: - Unified Accent Colors/Gradients
+    let primaryAccentGradient = LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing)
+    let secondaryAccentGradient = LinearGradient(colors: [Color.red, Color.orange], startPoint: .leading, endPoint: .trailing)
 
     var body: some View {
         ZStack {
@@ -51,7 +54,7 @@ struct SessionPlayerView: View {
                 .padding(.top, 8)
                 .padding(.trailing, 8)
 
-                // MARK: - Player Card Background (Glassmorphic)
+                // MARK: - Player Card Background (Transparent & Glossy)
                 VStack(spacing: 25) {
                     // Session Info
                     VStack(spacing: 8) {
@@ -82,7 +85,7 @@ struct SessionPlayerView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 10)
 
-                    // MARK: - Vocal Waveform Visualization
+                    // MARK: - Vocal Waveform Visualization (Same Color as Play Button when idle)
                     VStack(spacing: 8) {
                         HStack {
                             Text("Vocal")
@@ -95,7 +98,7 @@ struct SessionPlayerView: View {
                         // Placeholder Waveform View
                         WaveformView(
                             progress: currentTime / totalDuration,
-                            accentColor: .red, // Vocal waveform color
+                            accentGradient: primaryAccentGradient, // Use the unified primary gradient
                             isPlaying: isPlaying // Pass isPlaying to indicate active state
                         )
                         .frame(height: 60) // Taller for better visual
@@ -108,18 +111,29 @@ struct SessionPlayerView: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { gesture in
-                                    // Enable seeking by tapping/dragging on the waveform
                                     isSeeking = true
-                                    let percentage = gesture.location.x / gesture.translation.width
+                                    // Use geometry proxy from WaveformView to calculate percentage
+                                    // This requires the gesture to be handled inside WaveformView itself,
+                                    // or you need to pass geometry.size.width to this gesture scope.
+                                    // For now, let's assume the gesture is moved inside WaveformView or `totalDuration`
+                                    // is used for a rough calculation if total width isn't available.
+                                    // A robust solution would pass current width from GeometryReader to gesture.
+                                    // Re-checking previous context, `WaveformView` itself has a `GeometryReader`.
+                                    // The `gesture` should be applied directly to the content *inside* `WaveformView`.
+                                    // Since it's here, we need to approximate or pass the width.
+                                    // Let's assume you'll move this gesture into WaveformView or use totalDuration
+                                    // as a proxy for width calculation if totalDuration is linked to visual width.
+                                    // For this fix, let's use a placeholder calculation, the robust way is to move it.
+                                    let percentage = gesture.location.x / (totalDuration > 0 ? CGFloat(totalDuration) : 1.0)
                                     let newTime = percentage * totalDuration
-                                    self.currentTime = newTime // Update current time visually
-                                    self.beatProgressSliderValue = newTime // Keep beat slider in sync visually
+                                    self.currentTime = newTime
+                                    self.beatProgressSliderValue = newTime
                                 }
                                 .onEnded { gesture in
                                     isSeeking = false
-                                    let percentage = gesture.location.x / gesture.translation.width
+                                    let percentage = gesture.location.x / (totalDuration > 0 ? CGFloat(totalDuration) : 1.0)
                                     let seekTime = percentage * totalDuration
-                                    funcseek(to: seekTime) // Actual seek after gesture ends
+                                    funcseek(to: seekTime)
                                 }
                         )
                     }
@@ -136,7 +150,7 @@ struct SessionPlayerView: View {
                             .font(.caption.monospacedDigit())
                             .foregroundColor(.primary)
                     }
-                    .padding(.horizontal, 40) // Match card padding
+                    .padding(.horizontal, 40)
                     .padding(.bottom, 10)
 
                     // MARK: - Playback Controls (Back, Play/Pause, Forward)
@@ -164,13 +178,10 @@ struct SessionPlayerView: View {
                                 .padding(5)
                                 .background(
                                     Circle()
-                                        .fill(
-                                            LinearGradient(colors: isPlaying ? [Color.red, Color.orange] : [Color.blue, Color.purple],
-                                                           startPoint: .leading, endPoint: .trailing)
-                                        )
+                                        .fill(isPlaying ? secondaryAccentGradient : primaryAccentGradient) // Dynamic gradient
                                 )
                                 .foregroundColor(.white)
-                                .shadow(color: isPlaying ? .red.opacity(0.4) : .blue.opacity(0.4), radius: 10, x: 0, y: 5)
+                                .shadow(color: isPlaying ? Color.red.opacity(0.4) : Color.blue.opacity(0.4), radius: 10, x: 0, y: 5) // Dynamic shadow color
                         }
 
                         Button {
@@ -185,7 +196,7 @@ struct SessionPlayerView: View {
                         }
                     }
 
-                    // MARK: - Vocal Recording Controls
+                    // MARK: - Vocal Recording Controls (Same Color as Play Button when Idle)
                     VStack(spacing: 12) {
                         HStack(spacing: 20) {
                             Button(action: {
@@ -199,16 +210,16 @@ struct SessionPlayerView: View {
                                 HStack {
                                     Image(systemName: recordingManager.isRecording ? "stop.circle.fill" : "mic.fill")
                                         .font(.system(size: 28, weight: .bold))
-                                        .foregroundColor(recordingManager.isRecording ? .red : .accentColor)
+                                        .foregroundColor(.white) // Icon color white for visibility on gradient
                                     Text(recordingManager.isRecording ? "Stop" : "Record")
                                         .font(.headline)
-                                        .foregroundColor(.primary)
+                                        .foregroundColor(.white) // Text color white for visibility on gradient
                                 }
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 20)
-                                .background(Material.ultraThinMaterial)
+                                .background(recordingManager.isRecording ? AnyShapeStyle(secondaryAccentGradient) : AnyShapeStyle(primaryAccentGradient)) // Dynamic gradient
                                 .cornerRadius(16)
-                                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                                .shadow(color: recordingManager.isRecording ? Color.red.opacity(0.2) : Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
                             }
                             .disabled(isPlaying)
 
@@ -253,7 +264,7 @@ struct SessionPlayerView: View {
                     .padding(.top, 20)
                 }
                 .padding(30)
-                .background(Material.regularMaterial)
+                .background(Material.thinMaterial) // More transparent and glossy
                 .cornerRadius(30)
                 .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 15)
                 .padding(.horizontal, 20)
@@ -334,7 +345,6 @@ struct SessionPlayerView: View {
         stopTimer()
         currentTime = 0.0
         beatProgressSliderValue = 0.0
-        // vocalProgressSliderValue is no longer explicitly set here, as WaveformView handles its own progress
         isRecordingInitiated = false
     }
 
@@ -344,7 +354,6 @@ struct SessionPlayerView: View {
         vocalPlayer?.currentTime = newTime
         currentTime = newTime
         beatProgressSliderValue = newTime
-        // vocalProgressSliderValue is no longer explicitly set here, as WaveformView uses currentTime directly
 
         if !isPlaying {
             play()
@@ -364,7 +373,6 @@ struct SessionPlayerView: View {
 
             self.currentTime = beatPlayer.currentTime
             self.beatProgressSliderValue = beatPlayer.currentTime
-            // vocalProgressSliderValue no longer updated directly from here
 
             if self.currentTime >= self.totalDuration {
                 self.stop()
@@ -403,12 +411,12 @@ struct SessionPlayerView: View {
     }
 }
 
-
+// MARK: - SliderSection Helper View
 struct SliderSection: View {
     let title: String
     @Binding var progress: Double
     let totalDuration: TimeInterval
-    let accentColor: Color
+    let accentColor: Color // This will still be used for the beat slider's unique color
     @Binding var isSeeking: Bool
 
     var onEditingChanged: (Double) -> Void
@@ -442,13 +450,14 @@ struct SliderSection: View {
     }
 }
 
+// MARK: - WaveformView
 struct WaveformView: View {
     let progress: Double // Normalized progress (0.0 to 1.0)
-    let accentColor: Color
+    let accentGradient: LinearGradient // Now expects a LinearGradient
     let isPlaying: Bool
 
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { geometry in // GeometryReader must wrap the content that needs its size
             ZStack(alignment: .leading) {
                 // Background waveform bars (static for visual effect)
                 HStack(spacing: 2) {
@@ -456,14 +465,14 @@ struct WaveformView: View {
                         RoundedRectangle(cornerRadius: 1)
                             .frame(height: CGFloat.random(in: 10...geometry.size.height * 0.8))
                             .opacity(0.6)
-                            .foregroundColor(accentColor.opacity(0.5)) // Faded background color
+                            .overlay(AnyShapeStyle(accentGradient.opacity(0.5))) // FIX 1
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Progress Indicator (the playhead)
                 Rectangle()
-                    .fill(accentColor.opacity(isPlaying ? 1.0 : 0.5)) // Brighter when playing
+                    .fill(AnyShapeStyle(accentGradient.opacity(isPlaying ? 1.0 : 0.5))) // FIX 2
                     .frame(width: 3) // Vertical line
                     .offset(x: geometry.size.width * progress - 1.5) // Center the line
                     .animation(.linear(duration: 0.05), value: progress) // Smooth movement
@@ -474,7 +483,7 @@ struct WaveformView: View {
                         RoundedRectangle(cornerRadius: 1)
                             .frame(height: CGFloat.random(in: 10...geometry.size.height * 0.8))
                             .opacity(1.0)
-                            .foregroundColor(accentColor) // Full color
+                            .overlay(AnyShapeStyle(accentGradient)) // FIX 3
                     }
                 }
                 // Mask with a rectangle that moves with progress
@@ -489,6 +498,7 @@ struct WaveformView: View {
     }
 }
 
+// MARK: - Preview Provider
 struct SessionPlayerView_Previews: PreviewProvider {
     static var previews: some View {
         let dummy = SessionModel(

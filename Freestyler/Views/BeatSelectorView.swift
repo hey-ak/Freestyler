@@ -36,8 +36,8 @@ struct BeatSelectorView: View {
                 VStack(spacing: 0) {
                     Text("Pick Your Beat")
                         .font(.largeTitle)
-                        .fontWeight(.heavy) // Make title bolder
-                        .foregroundColor(.primary) // Adapt to dark/light mode
+                        .fontWeight(.heavy)
+                        .foregroundColor(.primary)
                         .padding(.bottom, 20)
                     
                     // Beat Selection Filters
@@ -47,8 +47,8 @@ struct BeatSelectorView: View {
                                 Text(scale)
                             }
                         }
-                        .pickerStyle(.menu) // Ensure consistent menu style
-                        .listRowBackground(Color.white.opacity(0.7)) // Slightly translucent background for form rows
+                        .pickerStyle(.menu)
+                        .listRowBackground(Color.white.opacity(0.7))
                         
                         Picker("BPM", selection: $selectedBPM) {
                             ForEach(bpms, id: \.self) { bpm in
@@ -58,16 +58,18 @@ struct BeatSelectorView: View {
                         .pickerStyle(.menu)
                         .listRowBackground(Color.white.opacity(0.7))
                     }
-                    .scrollContentBackground(.hidden) // Hide default form background
-                    .background(Color.clear) // Make form background clear to show gradient
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                     .frame(height: 160)
                     .scrollDisabled(true)
                     .padding(.horizontal)
-                    .cornerRadius(15) // Rounded corners for the form
-                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 5) // Subtle shadow
+                    .cornerRadius(15)
+                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 5)
                     
                     Button {
                         filteredBeats = allBeats.filter { $0.scale == selectedScale && $0.bpm == selectedBPM }
+                        selectedBeat = nil // Deselect any previously selected beat when finding new ones
+                        audioManager.stop() // Stop any ongoing playback
                     } label: {
                         Label("Find Beat", systemImage: "magnifyingglass")
                             .font(.headline)
@@ -80,40 +82,58 @@ struct BeatSelectorView: View {
                     .padding(.vertical, 20)
                     .padding(.horizontal)
                     
-                    // Filtered Beats List
+                    // MARK: - Filtered Beats Display (Enhanced Card Design)
                     if !filteredBeats.isEmpty {
-                        List(filteredBeats, id: \.id, selection: $selectedBeat) { beat in
-                            HStack {
-                                Text(beat.name)
-                                Spacer()
-                                if selectedBeat?.id == beat.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.accentColor) // Uses system accent color for consistency
+                        // Using ScrollView to make the "card" always visible and scrollable if many beats
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 12) { // Spacing between individual beat items
+                                ForEach(filteredBeats, id: \.id) { beat in
+                                    BeatCardView(beat: beat, isSelected: selectedBeat?.id == beat.id)
+                                        .onTapGesture {
+                                            selectedBeat = beat
+                                            // Optionally play a preview when selected
+                                            audioManager.play(fileName: beat.fileName)
+                                        }
                                 }
                             }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedBeat = beat
-                            }
-                            .listRowBackground(selectedBeat?.id == beat.id ? Color.blue.opacity(0.2) : Color.white.opacity(0.7)) // Highlight selected row
+                            .padding(.vertical, 10) // Padding inside the scroll view
                         }
-                        .listStyle(.insetGrouped)
-                        .frame(height: min(CGFloat(filteredBeats.count) * 60, 200))
-                        .clipShape(RoundedRectangle(cornerRadius: 15)) // Rounded corners for the list
+                        .frame(height: min(CGFloat(filteredBeats.count) * 90 + 20, 300)) // Dynamic height, max 300pt
                         .padding(.horizontal)
-                        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 5)
+                        .background(Material.regularMaterial) // Glassmorphic background for the card
+                        .cornerRadius(20)
+                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 8) // Enhanced shadow for depth
                         
+                        // MARK: - Playback and Freestyle Buttons
                         if let beat = selectedBeat {
-                            Button {
-                                showSessionView = true
-                            } label: {
-                                Label("Freestyle", systemImage: "music.mic")
-                                    .font(.headline)
-                                    .padding(.vertical, 14)
-                                    .frame(maxWidth: .infinity)
-                                    .background(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))
-                                    .foregroundColor(.white)
-                                    .cornerRadius(15)
+                            HStack(spacing: 20) {
+                                Button {
+                                    if audioManager.isPlaying {
+                                        audioManager.pause()
+                                    } else {
+                                        audioManager.play(fileName: beat.fileName)
+                                    }
+                                } label: {
+                                    Label(audioManager.isPlaying ? "Pause Beat" : "Play Beat", systemImage: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.headline)
+                                        .padding(.vertical, 10)
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.gray.opacity(0.2))
+                                        .foregroundColor(.primary)
+                                        .cornerRadius(15)
+                                }
+                                
+                                Button {
+                                    showSessionView = true // This will open the SessionPlayerView
+                                } label: {
+                                    Label("Freestyle", systemImage: "music.mic")
+                                        .font(.headline)
+                                        .padding(.vertical, 10)
+                                        .frame(maxWidth: .infinity)
+                                        .background(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(15)
+                                }
                             }
                             .padding(.top, 20)
                             .padding(.horizontal)
@@ -143,13 +163,17 @@ struct BeatSelectorView: View {
                 LinearGradient(colors: [Color.red.opacity(0.5), Color.blue.opacity(0.5)], startPoint: .leading, endPoint: .trailing),
                 for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar) // Ensures title is readable on dark gradient
+            .toolbarColorScheme(.dark, for: .navigationBar)
             
-            // Countdown Overlay
+            // MARK: - Countdown Overlay (for recording directly from here, if you choose to enable it)
+            // Currently, 'Freestyle' button leads to SessionPlayerView
+            // If you want to record directly from BeatSelectorView, move the logic here.
             if showCountdown {
                 CountdownView(isShowing: $showCountdown, seconds: settings.countdownLength) {
-                    startSession()
+                    startSession() // This would trigger recording etc. from BeatSelectorView
                 }
+                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                .zIndex(1)
             }
         }
         .onAppear {
@@ -160,25 +184,34 @@ struct BeatSelectorView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showSessionView) {
+        .fullScreenCover(isPresented: $showSessionView, onDismiss: stopSession) {
+            // Ensure SessionModel is created with all required parameters, including duration
+            // For a new recording, duration might initially be 0.0, and updated in SessionPlayerView
             if let beat = selectedBeat {
-                let session = SessionModel(
+                SessionPlayerView(session: SessionModel(
                     beatName: beat.name,
                     beatFileName: beat.fileName,
-                    vocalFileName: "vocal_\(UUID().uuidString).m4a",
+                    vocalFileName: "vocal_\(UUID().uuidString).m4a", // Unique filename for new recording
                     scale: beat.scale,
                     bpm: beat.bpm,
+                    duration: 0.0, // Initial duration for a new recording
                     timestamp: Date(),
-                    displayName: beat.name
-                )
-                SessionPlayerView(session: session)
+                    displayName: nil // User can set display name in SessionPlayerView
+                ))
+            } else {
+                // Fallback or alert if no beat is selected, though button should be disabled
+                Text("Error: No beat selected to freestyle to.")
+                    .onAppear {
+                        showSessionView = false
+                    }
             }
         }
     }
     
+    // This startSession is currently for if you initiate recording directly from this view.
+    // Given the new SessionPlayerView, you might move recording initiation logic there.
     private func startSession() {
         guard let beat = selectedBeat else { return }
-        // Start metronome, beat playback, and recording
         showBeatIndicator = settings.metronomeOn
         if settings.metronomeOn {
             metronomeManager.start(bpm: selectedBPM)
@@ -186,19 +219,80 @@ struct BeatSelectorView: View {
         audioManager.play(fileName: beat.fileName)
         recordingManager.startRecording()
         isRecordingSession = true
+        // This 'showSessionView' should ideally transition to the actual SessionPlayerView
+        // if recording is intended to happen there.
         showSessionView = true
     }
     
     private func stopSession() {
-        // Stop all playback and recording
         metronomeManager.stop()
         audioManager.stop()
         recordingManager.stopRecording()
         showBeatIndicator = false
         isRecordingSession = false
-        // At this point, beat and vocal files are saved separately for future use
+        // The vocal file name would be saved to the SessionModel
+        // by the SessionPlayerView if the recording was successful there.
     }
 }
+
+// MARK: - BeatCardView Helper
+struct BeatCardView: View {
+    let beat: BeatModel
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "music.note")
+                .font(.title2)
+                .foregroundColor(isSelected ? .white : .accentColor)
+                .frame(width: 40, height: 40)
+                // FIX 1: Ensure both sides of the conditional return the same type (ShapeStyle)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isSelected ?
+                              AnyShapeStyle(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing)) :
+                              AnyShapeStyle(Color.white.opacity(0.8))
+                        )
+                )
+                .cornerRadius(10)
+                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+            
+            VStack(alignment: .leading) {
+                Text(beat.name)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundColor(isSelected ? .white : .primary)
+                Text("\(beat.scale) | \(beat.bpm) BPM")
+                    .font(.subheadline)
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+            }
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.white)
+                    .font(.title2)
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 15)
+        .background(
+            // FIX 2: Ensure both sides of the conditional return the same type (ShapeStyle)
+            RoundedRectangle(cornerRadius: 15)
+                .fill(isSelected ?
+                      AnyShapeStyle(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing)) :
+                      AnyShapeStyle(Material.ultraThinMaterial)
+                )
+        )
+        .cornerRadius(15)
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(isSelected ? Color.blue.opacity(0.8) : Color.clear, lineWidth: 2)
+        )
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
 
 struct BeatSelectorView_Previews: PreviewProvider {
     static var previews: some View {
