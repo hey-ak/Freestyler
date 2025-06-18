@@ -108,10 +108,27 @@ class UserSessionManager: ObservableObject {
         email = nil
     }
     
+    func fetchProfile() {
+        guard let token = jwtToken else { return }
+        let url = URL(string: "\(apiBaseURL)/me")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                DispatchQueue.main.async {
+                    self.username = json["username"] as? String
+                    self.email = json["email"] as? String
+                }
+            }
+        }.resume()
+    }
+    
     func autoLogin() {
         if let token = loadTokenFromKeychain(), !token.isEmpty {
-            // Optionally, validate token with backend here
             isAuthenticated = true
+            fetchProfile()
         } else {
             isAuthenticated = false
         }

@@ -11,17 +11,11 @@ struct SettingsView: View {
                 Section {
                     VStack(spacing: 12) {
                         // Profile Image (placeholder)
-                        ZStack {
-                            Circle()
-                                .fill(Material.ultraThinMaterial)
-                                .frame(width: 90, height: 90)
-                                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 80, height: 80)
-                                .foregroundColor(.accentColor)
-                        }
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
+                            .foregroundColor(.accentColor)
                         // Username
                         Text(username)
                             .font(.title2)
@@ -68,4 +62,4 @@ struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView().environmentObject(UserSessionManager())
     }
-} 
+}

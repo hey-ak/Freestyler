@@ -26,4 +26,10 @@ exports.login = async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+};
+
+exports.getProfile = async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ username: user.username, email: user.email });
 }; 
