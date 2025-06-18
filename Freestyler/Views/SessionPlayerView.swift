@@ -31,6 +31,10 @@ struct SessionPlayerView: View {
     let primaryAccentGradient = LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing)
     let secondaryAccentGradient = LinearGradient(colors: [Color.red, Color.orange], startPoint: .leading, endPoint: .trailing)
 
+    // MARK: - Metronome
+    @StateObject private var metronomeManager = MetronomeManager()
+    @State private var metronomeOn = false
+
     var body: some View {
         ZStack {
             // Gradient Background
@@ -69,6 +73,24 @@ struct SessionPlayerView: View {
                             .foregroundColor(.secondary)
                     }
                     .padding(.bottom, 10)
+
+                    // MARK: - Metronome Toggle
+                    HStack {
+                        Toggle(isOn: $metronomeOn) {
+                            Label("Metronome", systemImage: "metronome")
+                                .font(.headline)
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        .onChange(of: metronomeOn) { value in
+                            if value {
+                                metronomeManager.start(bpm: session.bpm)
+                            } else {
+                                metronomeManager.stop()
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 8)
 
                     // MARK: - Beat Slider (Glassmorphic)
                     VStack(spacing: 8) {
@@ -286,6 +308,7 @@ struct SessionPlayerView: View {
         .onAppear(perform: setupAudioPlayers)
         .onDisappear {
             stop()
+            metronomeManager.stop()
         }
     }
 

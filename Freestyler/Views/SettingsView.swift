@@ -2,11 +2,43 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings = SettingsModel.shared
+    @AppStorage("isDarkMode") private var isDarkMode: Bool = false
+    @EnvironmentObject var sessionManager: UserSessionManager
     
     var body: some View {
         Form {
-            Section(header: Text("Metronome")) {
-                Toggle("Enable Metronome", isOn: $settings.metronomeOn)
+            if let username = sessionManager.username, let email = sessionManager.email {
+                Section {
+                    VStack(spacing: 12) {
+                        // Profile Image (placeholder)
+                        ZStack {
+                            Circle()
+                                .fill(Material.ultraThinMaterial)
+                                .frame(width: 90, height: 90)
+                                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 80, height: 80)
+                                .foregroundColor(.accentColor)
+                        }
+                        // Username
+                        Text(username)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        // Email
+                        Text(email)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .listRowBackground(Color.clear)
+                }
+            }
+            Section(header: Text("Appearance")) {
+                Toggle("Dark Mode", isOn: $isDarkMode)
             }
             Section(header: Text("Countdown Length")) {
                 Picker("Countdown", selection: $settings.countdownLength) {
@@ -15,13 +47,25 @@ struct SettingsView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
             }
+            Section {
+                Button(role: .destructive) {
+                    sessionManager.logout()
+                } label: {
+                    HStack {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text("Log Out")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .navigationTitle("Settings")
+        .preferredColorScheme(isDarkMode ? .dark : .light)
     }
 }
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView()
+        SettingsView().environmentObject(UserSessionManager())
     }
 } 
