@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFAudio
 
 class SessionStore: ObservableObject {
     @Published var sessions: [SessionModel] = []
@@ -40,6 +41,124 @@ class SessionStore: ObservableObject {
     }
 }
 
+struct SessionAudioPlayerView: View {
+    let session: SessionModel
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var isPlaying = false
+    @State private var duration: TimeInterval = 0
+    @State private var currentTime: TimeInterval = 0
+    @State private var timer: Timer?
+
+    var body: some View {
+        VStack(spacing: 32) {
+            Text(session.displayName ?? session.beatName)
+                .font(.title2.bold())
+                .padding(.top, 40)
+            Text("File: \(session.vocalFileName)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            HStack(spacing: 40) {
+                Button(action: {
+                    if isPlaying {
+                        pause()
+                    } else {
+                        play()
+                    }
+                }) {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .resizable()
+                        .frame(width: 64, height: 64)
+                        .foregroundColor(.blue)
+                }
+            }
+            Slider(value: $currentTime, in: 0...duration, onEditingChanged: { editing in
+                if !editing {
+                    audioPlayer?.currentTime = currentTime
+                }
+            })
+            .padding(.horizontal, 24)
+            .accentColor(.blue)
+            Text("\(formatTime(currentTime)) / \(formatTime(duration))")
+                .font(.caption.monospacedDigit())
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .onAppear(perform: setupPlayer)
+        .onDisappear(perform: stop)
+    }
+
+    private func setupPlayer() {
+        // Ensure audio plays through the main speaker
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to set AVAudioSession category: \(error)")
+        }
+        let url = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
+        do {
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            duration = audioPlayer?.duration ?? 0
+            currentTime = 0
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.delegate = AVAudioPlayerDelegateProxy(onFinish: {
+                isPlaying = false
+                stopTimer()
+            })
+        } catch {
+            print("Failed to load audio: \(error)")
+        }
+    }
+
+    private func play() {
+        audioPlayer?.play()
+        isPlaying = true
+        startTimer()
+    }
+    private func pause() {
+        audioPlayer?.pause()
+        isPlaying = false
+        stopTimer()
+    }
+    private func stop() {
+        audioPlayer?.stop()
+        isPlaying = false
+        stopTimer()
+        currentTime = 0
+    }
+    private func startTimer() {
+        stopTimer()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if let player = audioPlayer {
+                currentTime = player.currentTime
+                if currentTime >= duration {
+                    isPlaying = false
+                    stopTimer()
+                }
+            }
+        }
+    }
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    private func getDocumentsDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+// Helper AVAudioPlayerDelegate proxy
+class AVAudioPlayerDelegateProxy: NSObject, AVAudioPlayerDelegate {
+    let onFinish: () -> Void
+    init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) { onFinish() }
+}
+
 struct SessionListView: View {
     @StateObject private var store = SessionStore()
     @State private var renamingSession: SessionModel?
@@ -49,7 +168,7 @@ struct SessionListView: View {
         NavigationView {
             List {
                 ForEach(store.sessions) { session in
-                    NavigationLink(destination: SessionPlayerView(session: session)) {
+                    NavigationLink(destination: SessionAudioPlayerView(session: session)) {
                         VStack(alignment: .leading) {
                             Text(session.displayName ?? session.beatName)
                                 .font(.headline)

@@ -33,6 +33,22 @@ class RecordingManager: NSObject, ObservableObject, AVAudioRecorderDelegate {
     func stopRecording() {
         audioRecorder?.stop()
         isRecording = false
+        audioRecorder = nil
+        if let url = recordedFileURL {
+            // Create a new session and add to SessionStore
+            let session = SessionModel(
+                beatName: "Custom Beat", // TODO: Pass actual beat name
+                beatFileName: "", // TODO: Pass actual beat file name
+                vocalFileName: url.lastPathComponent,
+                scale: "", // TODO: Pass actual scale
+                bpm: 0, // TODO: Pass actual bpm
+                duration: 0, // TODO: Calculate duration if possible
+                timestamp: Date(),
+                displayName: nil
+            )
+            let store = SessionStore()
+            store.addSession(session)
+        }
     }
     
     private func getDocumentsDirectory() -> URL {

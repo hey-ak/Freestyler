@@ -7,6 +7,9 @@ struct SessionPlayerView: View {
 
     // MARK: - Playback States
     @State private var beatPlayer: AVAudioPlayer?
+    @State private var avPlayer: AVPlayer?
+    @State private var avPlayerObserver: Any?
+    @State private var isRemote: Bool = false
     @State private var vocalPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var currentTime: TimeInterval = 0.0
@@ -34,7 +37,7 @@ struct SessionPlayerView: View {
     // MARK: - Metronome
     @StateObject private var metronomeManager = MetronomeManager()
     @State private var metronomeOn = false
-
+    
     var body: some View {
         ZStack {
             // Gradient Background
@@ -62,7 +65,7 @@ struct SessionPlayerView: View {
                 VStack(spacing: 25) {
                     // Session Info
                     VStack(spacing: 8) {
-                        Text(session.displayName ?? session.beatName)
+            Text(session.displayName ?? session.beatName)
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundColor(.primary)
@@ -70,7 +73,7 @@ struct SessionPlayerView: View {
 
                         Text("\(session.scale) | \(session.bpm) BPM")
                             .font(.headline)
-                            .foregroundColor(.secondary)
+                .foregroundColor(.secondary)
                     }
                     .padding(.bottom, 10)
 
@@ -176,7 +179,7 @@ struct SessionPlayerView: View {
                     .padding(.bottom, 10)
 
                     // MARK: - Playback Controls (Back, Play/Pause, Forward)
-                    HStack(spacing: 40) {
+            HStack(spacing: 40) {
                         Button {
                             seek(by: -seekInterval)
                         } label: {
@@ -189,11 +192,11 @@ struct SessionPlayerView: View {
                         }
 
                         Button {
-                            if isPlaying {
-                                pause()
-                            } else {
-                                play()
-                            }
+                    if isPlaying {
+                        pause()
+                    } else {
+                        play()
+                    }
                         } label: {
                             Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                 .font(.system(size: 60, weight: .semibold))
@@ -295,12 +298,12 @@ struct SessionPlayerView: View {
 
             // MARK: - Countdown Overlay
             if showCountdown {
-                CountdownView(isShowing: $showCountdown, seconds: settings.countdownLength) {
+                CountdownView(isShowing: $showCountdown, seconds: settings.countdownLength, onComplete: {
                     recordingManager.startRecording()
                     if !isPlaying {
                         play()
                     }
-                }
+                })
                 .transition(.opacity.animation(.easeInOut(duration: 0.3)))
                 .zIndex(1)
             }
@@ -309,77 +312,122 @@ struct SessionPlayerView: View {
         .onDisappear {
             stop()
             metronomeManager.stop()
+            if let observer = avPlayerObserver, let avPlayer = avPlayer {
+                avPlayer.removeTimeObserver(observer)
+                avPlayerObserver = nil
+            }
         }
     }
-
+    
     // MARK: - Audio Playback Methods
     private func setupAudioPlayers() {
-        let beatURL = Bundle.main.url(forResource: session.beatFileName, withExtension: nil) ?? getDocumentsDirectory().appendingPathComponent(session.beatFileName)
-        let vocalURL = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
-
-        do {
-            beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
-            if FileManager.default.fileExists(atPath: vocalURL.path) {
-                vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
-            } else {
-                print("Vocal file does not exist at: \(vocalURL.lastPathComponent)")
-                vocalPlayer = nil
+        let beatFile = session.beatFileName
+        if beatFile.hasPrefix("http://") || beatFile.hasPrefix("https://") {
+            // Remote file: use AVPlayer
+            isRemote = true
+            let url = URL(string: beatFile)!
+            avPlayer = AVPlayer(url: url)
+            // Get duration asynchronously
+            avPlayer?.currentItem?.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
+                let duration = self.avPlayer?.currentItem?.asset.duration
+                let seconds = duration?.isIndefinite == false ? CMTimeGetSeconds(duration!) : 0.0
+                DispatchQueue.main.async {
+                    self.totalDuration = seconds
+                }
             }
-
-            beatPlayer?.prepareToPlay()
-            vocalPlayer?.prepareToPlay()
-
-            totalDuration = beatPlayer?.duration ?? 0.0
-
-        } catch {
-            print("Failed to set up players: \(error.localizedDescription)")
+            // Add periodic observer for progress
+            avPlayerObserver = avPlayer?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.05, preferredTimescale: 600), queue: .main) { time in
+                guard !self.isSeeking else { return }
+                self.currentTime = CMTimeGetSeconds(time)
+                self.beatProgressSliderValue = self.currentTime
+            }
+        } else {
+            // Local file: use AVAudioPlayer
+            isRemote = false
+            let beatURL = Bundle.main.url(forResource: beatFile, withExtension: nil) ?? getDocumentsDirectory().appendingPathComponent(beatFile)
+            let vocalURL = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
+            do {
+                beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
+                if FileManager.default.fileExists(atPath: vocalURL.path) {
+                    vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
+                } else {
+                    print("Vocal file does not exist at: \(vocalURL.lastPathComponent)")
+                    vocalPlayer = nil
+                }
+                beatPlayer?.prepareToPlay()
+                vocalPlayer?.prepareToPlay()
+                totalDuration = beatPlayer?.duration ?? 0.0
+            } catch {
+                print("Failed to set up players: \(error.localizedDescription)")
+            }
         }
     }
 
     private func play() {
-        guard let beatPlayer = beatPlayer else {
-            setupAudioPlayers()
-            return
+        if isRemote {
+            avPlayer?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
+            avPlayer?.play()
+            isPlaying = true
+        } else {
+            guard let beatPlayer = beatPlayer else {
+                setupAudioPlayers()
+                return
+            }
+            beatPlayer.currentTime = currentTime
+            vocalPlayer?.currentTime = currentTime
+            if !beatPlayer.isPlaying { beatPlayer.play() }
+            if !(vocalPlayer?.isPlaying ?? true) {
+                vocalPlayer?.play()
+            }
+            isPlaying = true
+            startTimer()
         }
-
-        beatPlayer.currentTime = currentTime
-        vocalPlayer?.currentTime = currentTime
-
-        if !beatPlayer.isPlaying { beatPlayer.play() }
-        if !(vocalPlayer?.isPlaying ?? true) {
-            vocalPlayer?.play()
-        }
-
-        isPlaying = true
-        startTimer()
     }
-
+    
     private func pause() {
-        beatPlayer?.pause()
-        vocalPlayer?.pause()
-        isPlaying = false
-        stopTimer()
+        if isRemote {
+            avPlayer?.pause()
+            isPlaying = false
+        } else {
+            beatPlayer?.pause()
+            vocalPlayer?.pause()
+            isPlaying = false
+            stopTimer()
+        }
     }
-
+    
     private func stop() {
-        beatPlayer?.stop()
-        vocalPlayer?.stop()
-        isPlaying = false
-        stopTimer()
-        currentTime = 0.0
-        beatProgressSliderValue = 0.0
-        isRecordingInitiated = false
+        if isRemote {
+            avPlayer?.pause()
+            avPlayer?.seek(to: .zero)
+            isPlaying = false
+            currentTime = 0.0
+            beatProgressSliderValue = 0.0
+        } else {
+            beatPlayer?.stop()
+            vocalPlayer?.stop()
+            isPlaying = false
+            stopTimer()
+            currentTime = 0.0
+            beatProgressSliderValue = 0.0
+            isRecordingInitiated = false
+        }
     }
 
     private func funcseek(to time: TimeInterval) {
         let newTime = max(0, min(time, totalDuration))
-        beatPlayer?.currentTime = newTime
-        vocalPlayer?.currentTime = newTime
-        currentTime = newTime
-        beatProgressSliderValue = newTime
-
-        if !isPlaying {
-            play()
+        if isRemote {
+            avPlayer?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+            currentTime = newTime
+            beatProgressSliderValue = newTime
+        } else {
+            beatPlayer?.currentTime = newTime
+            vocalPlayer?.currentTime = newTime
+            currentTime = newTime
+            beatProgressSliderValue = newTime
+            if !isPlaying {
+                play()
+            }
         }
     }
 
@@ -393,16 +441,14 @@ struct SessionPlayerView: View {
         stopTimer()
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
             guard !self.isSeeking, let beatPlayer = self.beatPlayer else { return }
-
             self.currentTime = beatPlayer.currentTime
             self.beatProgressSliderValue = beatPlayer.currentTime
-
             if self.currentTime >= self.totalDuration {
                 self.stop()
             }
         }
     }
-
+    
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
@@ -414,7 +460,7 @@ struct SessionPlayerView: View {
         let seconds = Int(time) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
-
+    
     private func getDocumentsDirectory() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
@@ -536,4 +582,4 @@ struct SessionPlayerView_Previews: PreviewProvider {
         )
         SessionPlayerView(session: dummy)
     }
-}
+} 

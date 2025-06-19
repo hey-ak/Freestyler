@@ -1,8 +1,10 @@
 import SwiftUI
 
+let backendBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app" // <-- Replace with your actual ngrok HTTPS URL
+
 struct BeatSelectorView: View {
-    @State private var selectedScale: String = "C Major"
-    @State private var selectedBPM: Int = 90
+    @State private var selectedScale: String = ""
+    @State private var selectedBPM: Int = 0
     @State private var filteredBeats: [BeatModel] = []
     @State private var selectedBeat: BeatModel?
     @ObservedObject private var audioManager = AudioManager()
@@ -17,17 +19,26 @@ struct BeatSelectorView: View {
     @State private var showSettings = false
     @State private var showScalePicker = false
     @State private var showBPMPicker = false
+    @State private var customBPM: Int? = nil
+    @State private var showCustomBPMDialog = false
+    @State private var customBPMInput = ""
+    @State private var customScaleInput = ""
+    @State private var showCustomScaleDialog = false
+    @State private var allBeats: [BeatModel] = []
     
-    let scales = ["C Major", "A Minor", "G Major", "E Minor"]
-    let bpms = [70, 90, 120]
-    let allBeats: [BeatModel] = [
-        BeatModel(name: "Chill Groove", scale: "C Major", bpm: 90, fileName: "beat1.mp3"),
-        BeatModel(name: "Uptempo Flow", scale: "A Minor", bpm: 120, fileName: "beat2.mp3"),
-        BeatModel(name: "Smooth Jam", scale: "G Major", bpm: 70, fileName: "beat3.mp3")
-    ]
+    var uniqueScales: [String] {
+        let scales = allBeats.map { $0.scale }
+        let set = Set(scales)
+        return Array(set).sorted()
+    }
+    var uniqueBPMs: [Int] {
+        let bpms = allBeats.map { $0.bpm }
+        let set = Set(bpms)
+        return Array(set).sorted()
+    }
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ZStack {
                 // Enhanced gradient background
                 RadialGradient(
@@ -85,9 +96,10 @@ struct BeatSelectorView: View {
                                 showScalePicker = true
                             }
                             .confirmationDialog("Select Scale", isPresented: $showScalePicker, titleVisibility: .visible) {
-                                ForEach(scales, id: \.self) { scale in
+                                ForEach(uniqueScales, id: \.self) { scale in
                                     Button(scale) { selectedScale = scale }
                                 }
+                                Button("Custom Scale...") { showCustomScaleDialog = true }
                             }
                             
                             FilterButton(
@@ -98,19 +110,31 @@ struct BeatSelectorView: View {
                                 showBPMPicker = true
                             }
                             .confirmationDialog("Select BPM", isPresented: $showBPMPicker, titleVisibility: .visible) {
-                                ForEach(bpms, id: \.self) { bpm in
+                                ForEach(uniqueBPMs, id: \.self) { bpm in
                                     Button("\(bpm)") { selectedBPM = bpm }
                                 }
+                                Button("Custom BPM...") { showCustomBPMDialog = true }
                             }
                         }
+                        .alert("Enter Custom BPM", isPresented: $showCustomBPMDialog, actions: {
+                            TextField("BPM", text: $customBPMInput)
+                                .keyboardType(.numberPad)
+                            Button("OK") {
+                                if let bpm = Int(customBPMInput), bpm > 0 {
+                                    selectedBPM = bpm
+                                }
+                                customBPMInput = ""
+                            }
+                            Button("Cancel", role: .cancel) {
+                                customBPMInput = ""
+                            }
+                        }, message: {
+                            Text("Enter a BPM value.")
+                        })
                         
                         // Search button
                         Button {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                filteredBeats = allBeats.filter { $0.scale == selectedScale && $0.bpm == selectedBPM }
-                                selectedBeat = nil
-                                audioManager.stop()
-                            }
+                            findBeatsFromBackend()
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "waveform.path.badge.plus")
@@ -131,6 +155,7 @@ struct BeatSelectorView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                             .shadow(color: .purple.opacity(0.4), radius: 15, x: 0, y: 8)
                         }
+                        .disabled(selectedScale.isEmpty || selectedBPM == 0)
                         .scaleEffect(filteredBeats.isEmpty ? 1.0 : 0.98)
                         .animation(.spring(response: 0.3), value: filteredBeats.isEmpty)
                     }
@@ -150,7 +175,11 @@ struct BeatSelectorView: View {
                                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                             selectedBeat = beat
                                         }
-                                        audioManager.play(fileName: beat.fileName)
+                                        if let fileUrl = beat.fileUrl, let url = URL(string: fileUrl) {
+                                            audioManager.play(fileName: url.absoluteString)
+                                        } else if let fileName = beat.fileName {
+                                            audioManager.play(fileName: fileName)
+                                        }
                                     }
                                 }
                             }
@@ -170,7 +199,19 @@ struct BeatSelectorView: View {
                                     if audioManager.isPlaying {
                                         audioManager.pause()
                                     } else {
-                                        audioManager.play(fileName: beat.fileName)
+                                        // Play selected beat (remote or local)
+                                        if let fileUrl = beat.fileUrl {
+                                            // If fileUrl is a full URL, use it directly
+                                            let urlString: String
+                                            if fileUrl.hasPrefix("http://") || fileUrl.hasPrefix("https://") {
+                                                urlString = fileUrl
+                                            } else {
+                                                urlString = backendBaseURL + fileUrl
+                                            }
+                                            audioManager.play(fileName: urlString)
+                                        } else if let fileName = beat.fileName {
+                                            audioManager.play(fileName: fileName)
+                                        }
                                     }
                                 }
                                 
@@ -220,16 +261,15 @@ struct BeatSelectorView: View {
                 .padding(.top, 8)
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                    }
+            .navigationBarItems(trailing:
+                Button(action: {
+                    showSettings = true
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.title2)
+                        .foregroundColor(.primary)
                 }
-            }
+            )
             
             if showCountdown {
                 CountdownView(isShowing: $showCountdown, seconds: settings.countdownLength) {
@@ -246,19 +286,37 @@ struct BeatSelectorView: View {
                     beatIndicatorOn = false
                 }
             }
+            fetchBeats()
         }
         .fullScreenCover(isPresented: $showSessionView, onDismiss: stopSession) {
             if let beat = selectedBeat {
-                SessionPlayerView(session: SessionModel(
-                    beatName: beat.name,
-                    beatFileName: beat.fileName,
-                    vocalFileName: "vocal_\(UUID().uuidString).m4a",
-                    scale: beat.scale,
-                    bpm: beat.bpm,
-                    duration: 0.0,
-                    timestamp: Date(),
-                    displayName: nil
-                ))
+                // Safely get beatFileName
+                let beatFileName: String? = {
+                    if let fileName = beat.fileName, !fileName.isEmpty {
+                        return fileName
+                    } else if let fileUrl = beat.fileUrl, let url = URL(string: fileUrl) {
+                        return url.lastPathComponent
+                    } else {
+                        return nil
+                    }
+                }()
+                if let beatFileName = beatFileName {
+                    SessionPlayerView(session: SessionModel(
+                        beatName: beat.name,
+                        beatFileName: beatFileName,
+                        vocalFileName: "vocal_\(UUID().uuidString).m4a",
+                        scale: beat.scale,
+                        bpm: beat.bpm,
+                        duration: 0.0,
+                        timestamp: Date(),
+                        displayName: nil
+                    ))
+                } else {
+                    Text("Error: Beat file not found")
+                        .onAppear {
+                            showSessionView = false
+                        }
+                }
             } else {
                 Text("Error: No beat selected")
                     .onAppear {
@@ -267,8 +325,25 @@ struct BeatSelectorView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView()
+            NavigationStack {
+                SettingsView()
+            }
         }
+        .alert("Enter Custom Scale", isPresented: $showCustomScaleDialog, actions: {
+            TextField("Scale", text: $customScaleInput)
+            Button("OK") {
+                let trimmed = customScaleInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    selectedScale = trimmed
+                }
+                customScaleInput = ""
+            }
+            Button("Cancel", role: .cancel) {
+                customScaleInput = ""
+            }
+        }, message: {
+            Text("Enter a scale name.")
+        })
     }
     
     private func startSession() {
@@ -277,7 +352,11 @@ struct BeatSelectorView: View {
         if settings.metronomeOn {
             metronomeManager.start(bpm: selectedBPM)
         }
-        audioManager.play(fileName: beat.fileName)
+        if let fileUrl = beat.fileUrl, let url = URL(string: backendBaseURL + fileUrl) {
+            audioManager.play(fileName: url.absoluteString)
+        } else if let fileName = beat.fileName {
+            audioManager.play(fileName: fileName)
+        }
         recordingManager.startRecording()
         isRecordingSession = true
         showSessionView = true
@@ -289,6 +368,37 @@ struct BeatSelectorView: View {
         recordingManager.stopRecording()
         showBeatIndicator = false
         isRecordingSession = false
+    }
+    
+    private func fetchBeats() {
+        guard let url = URL(string: "\(backendBaseURL)/beats") else { return }
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data, error == nil else { return }
+            if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
+                DispatchQueue.main.async {
+                    allBeats = decoded
+                    if let firstScale = self.uniqueScales.first { self.selectedScale = firstScale }
+                    if let firstBPM = self.uniqueBPMs.first { self.selectedBPM = firstBPM }
+                }
+            }
+        }.resume()
+    }
+    
+    private func findBeatsFromBackend() {
+        guard !selectedScale.isEmpty, selectedBPM > 0 else { return }
+        let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
+        guard let url = URL(string: urlString) else { return }
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data, error == nil else { return }
+            if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
+                DispatchQueue.main.async {
+                    filteredBeats = decoded
+                    selectedBeat = nil
+                    audioManager.stop()
+                }
+            }
+        }.resume()
     }
 }
 

@@ -18,13 +18,15 @@
                 <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
             </dict>
-            <key>192.168.1.10</key> <!-- Replace with your local IP if using a device -->
-            <dict>
+            <key>192.168.1.10</key> <dict>
                 <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
             </dict>
         </dict>
     </dict>
-    <!-- ... other keys ... -->
-</dict>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app needs microphone access to enable voice recording and communication features.</string>
+
+    </dict>
 </plist>

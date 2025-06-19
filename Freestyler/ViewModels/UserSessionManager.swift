@@ -10,7 +10,7 @@ class UserSessionManager: ObservableObject {
     
     private let keychainService = "com.freestyler.auth"
     private let tokenKey = "jwtToken"
-    private let apiBaseURL = "http://localhost:5001/api/auth" // Use your backend URL or local IP for device
+    private let apiBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app"
     
     var jwtToken: String? {
         get { loadTokenFromKeychain() }
@@ -30,7 +30,7 @@ class UserSessionManager: ObservableObject {
     func login(email: String, password: String) {
         authError = nil
         isLoading = true
-        let url = URL(string: "\(apiBaseURL)/login")!
+        let url = URL(string: "\(apiBaseURL)/api/auth/login")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -67,7 +67,7 @@ class UserSessionManager: ObservableObject {
     func signup(email: String, password: String, username: String) {
         authError = nil
         isLoading = true
-        let url = URL(string: "\(apiBaseURL)/signup")!
+        let url = URL(string: "\(apiBaseURL)/api/auth/signup")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -110,7 +110,7 @@ class UserSessionManager: ObservableObject {
     
     func fetchProfile() {
         guard let token = jwtToken else { return }
-        let url = URL(string: "\(apiBaseURL)/me")!
+        let url = URL(string: "\(apiBaseURL)/api/auth/me")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -171,3 +171,4 @@ class UserSessionManager: ObservableObject {
         SecItemDelete(query as CFDictionary)
     }
 } 
+ 

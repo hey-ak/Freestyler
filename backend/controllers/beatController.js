@@ -6,7 +6,21 @@ exports.getBeats = async (req, res) => {
   if (scale) filter.scale = scale;
   if (bpm) filter.bpm = Number(bpm);
   const beats = await Beat.find(filter);
-  res.json(beats);
+  const appUrl = process.env.APP_URL || (req.protocol + '://' + req.get('host'));
+  const beatsWithFullUrl = beats.map(beat => {
+    let fileUrl = beat.fileUrl;
+    // If fileUrl is not a full URL, prepend appUrl
+    if (fileUrl && !/^https?:\/\//i.test(fileUrl)) {
+      // Remove leading slash if present
+      fileUrl = fileUrl.replace(/^\/+/, '');
+      fileUrl = `${appUrl}/${fileUrl}`;
+    }
+    return {
+      ...beat.toObject(),
+      fileUrl
+    };
+  });
+  res.json(beatsWithFullUrl);
 };
 
 exports.getBeatById = async (req, res) => {

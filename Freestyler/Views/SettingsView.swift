@@ -41,6 +41,11 @@ struct SettingsView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
             }
+            Section(header: Text("Sessions")) {
+                NavigationLink(destination: SessionListView()) {
+                    Label("View Recorded Sessions", systemImage: "music.note.list")
+                }
+            }
             Section {
                 Button(role: .destructive) {
                     sessionManager.logout()
@@ -62,4 +67,4 @@ struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView().environmentObject(UserSessionManager())
     }
-}
+} 

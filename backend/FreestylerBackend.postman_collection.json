@@ -1,0 +1,72 @@
+{
+  "info": {
+    "name": "Freestyler Backend API",
+    "_postman_id": "freestyler-backend-api-collection",
+    "description": "Postman collection for testing Freestyler backend endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Signup",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/auth/signup", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "signup"] }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/auth/login", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "Auth - Me (Profile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+        ],
+        "url": { "raw": "http://localhost:5000/api/auth/me", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "me"] }
+      }
+    },
+    {
+      "name": "Beats - Get All",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "http://localhost:5000/api/beats", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "beats"] }
+      }
+    },
+    {
+      "name": "Beats - Upload (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "title", "value": "Test Beat", "type": "text" },
+            { "key": "file", "type": "file", "src": "" }
+          ]
+        },
+        "url": { "raw": "http://localhost:5000/api/beats/upload", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "beats", "upload"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "jwt_token", "value": "" }
+  ]
+} 

@@ -15,7 +15,7 @@ struct FreestylerApp: App {
         WindowGroup {
             Group {
                 if sessionManager.isAuthenticated {
-                    ContentView()
+            ContentView()
                 } else {
                     LoginView(sessionManager: sessionManager)
                 }
