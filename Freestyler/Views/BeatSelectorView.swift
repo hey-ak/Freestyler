@@ -292,10 +292,10 @@ struct BeatSelectorView: View {
             if let beat = selectedBeat {
                 // Safely get beatFileName
                 let beatFileName: String? = {
-                    if let fileName = beat.fileName, !fileName.isEmpty {
+                    if let fileUrl = beat.fileUrl, !fileUrl.isEmpty {
+                        return fileUrl // Pass the full remote URL if available
+                    } else if let fileName = beat.fileName, !fileName.isEmpty {
                         return fileName
-                    } else if let fileUrl = beat.fileUrl, let url = URL(string: fileUrl) {
-                        return url.lastPathComponent
                     } else {
                         return nil
                     }
