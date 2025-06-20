@@ -7,10 +7,11 @@ class UserSessionManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var username: String?
     @Published var email: String?
+    @Published var profileImage: String?
     
     private let keychainService = "com.freestyler.auth"
     private let tokenKey = "jwtToken"
-    private let apiBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app"
+    let apiBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app"
     
     var jwtToken: String? {
         get { loadTokenFromKeychain() }
@@ -106,6 +107,7 @@ class UserSessionManager: ObservableObject {
         isAuthenticated = false
         username = nil
         email = nil
+        profileImage = nil
     }
     
     func fetchProfile() {
@@ -120,7 +122,37 @@ class UserSessionManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.username = json["username"] as? String
                     self.email = json["email"] as? String
+                    self.profileImage = json["profileImage"] as? String
                 }
+            }
+        }.resume()
+    }
+    
+    func uploadProfileImage(imageData: Data, completion: @escaping (Bool) -> Void) {
+        guard let token = jwtToken else { completion(false); return }
+        let url = URL(string: "\(apiBaseURL)/api/auth/profile/image")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let boundary = UUID().uuidString
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"profileImage\"; filename=\"profile.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let profileImage = json["profileImage"] as? String {
+                DispatchQueue.main.async {
+                    self.profileImage = profileImage
+                    completion(true)
+                }
+            } else {
+                completion(false)
             }
         }.resume()
     }

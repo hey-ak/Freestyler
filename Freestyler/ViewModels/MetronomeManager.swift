@@ -27,8 +27,8 @@ class MetronomeManager: ObservableObject {
     }
     
     private func playClick() {
-        guard let url = Bundle.main.url(forResource: "click", withExtension: "wav") else {
-            print("Metronome click sound not found")
+        guard let url = Bundle.main.url(forResource: "metronome", withExtension: "mp3") else {
+            print("Metronome sound not found")
             return
         }
         do {

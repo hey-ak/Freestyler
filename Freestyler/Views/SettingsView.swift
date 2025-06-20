@@ -1,9 +1,19 @@
 import SwiftUI
+import PhotosUI
 
 struct SettingsView: View {
     @ObservedObject var settings = SettingsModel.shared
     @AppStorage("isDarkMode") private var isDarkMode: Bool = false
     @EnvironmentObject var sessionManager: UserSessionManager
+    @State private var showImagePicker = false
+    @State private var selectedUIImage: UIImage?
+    @State private var isUploading = false
+    @State private var metronomeVolume: Double = SettingsModel.shared.metronomeVolume
+    @State private var metronomeSound: String = SettingsModel.shared.metronomeSound
+    @State private var showMetronomeSettings = false
+    @State private var metronomeBPM: Int = 90 // Default value, can be loaded from SettingsModel
+    @State private var metronomeTimeSignature: String = "4/4"
+    let timeSignatures = ["4/4", "3/4", "2/4", "6/8"]
     
     var body: some View {
         ScrollView {
@@ -17,6 +27,7 @@ struct SettingsView: View {
                 VStack(spacing: 16) {
                     appearanceSection
                     countdownSection
+                    metronomeSection
                     sessionsSection
                     logoutSection
                 }
@@ -28,6 +39,20 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
         .preferredColorScheme(isDarkMode ? .dark : .light)
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedUIImage)
+        }
+        .onChange(of: selectedUIImage) { newImage in
+            guard let image = newImage, let data = image.jpegData(compressionQuality: 0.8) else { return }
+            isUploading = true
+            sessionManager.uploadProfileImage(imageData: data) { success in
+                isUploading = false
+                if success {
+                    selectedUIImage = nil // Clear picker
+                    sessionManager.fetchProfile() // Refresh from backend
+                }
+            }
+        }
     }
     
     // MARK: - Profile Section
@@ -45,15 +70,44 @@ struct SettingsView: View {
                         )
                     )
                     .frame(width: 100, height: 100)
-                
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 60, height: 60)
-                    .foregroundColor(.white)
+                if let imageUrl = sessionManager.profileImage, let url = URL(string: imageUrl, relativeTo: URL(string: sessionManager.apiBaseURL)) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 90, height: 90)
+                                .clipShape(Circle())
+                        } else if phase.error != nil {
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 90, height: 90)
+                                .clipShape(Circle())
+                                .foregroundColor(.white)
+                        } else {
+                            ProgressView()
+                                .frame(width: 90, height: 90)
+                        }
+                    }
+                    .id(sessionManager.profileImage ?? "")
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
+                        .foregroundColor(.white)
+                }
+                if isUploading {
+                    ProgressView()
+                        .frame(width: 90, height: 90)
+                }
             }
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            
+            .onTapGesture {
+                showImagePicker = true
+            }
             VStack(spacing: 4) {
                 Text(username)
                     .font(.title2)
@@ -113,6 +167,94 @@ struct SettingsView: View {
                 .pickerStyle(SegmentedPickerStyle())
             }
             .padding(.vertical, 4)
+        }
+    }
+    
+    // MARK: - Metronome Section
+    private var metronomeSection: some View {
+        Button(action: { showMetronomeSettings = true }) {
+            settingsCard(title: "Metronome Settings", icon: "metronome") {
+                HStack {
+                    Image(systemName: "metronome")
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
+                    Text("Metronome")
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showMetronomeSettings) {
+            NavigationView {
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("Metronome Settings")
+                        .font(.title2.bold())
+                        .padding(.top)
+                    // Volume
+                    VStack(alignment: .leading) {
+                        Text("Volume")
+                            .font(.headline)
+                        Slider(value: $metronomeVolume, in: 0...1, step: 0.01) {
+                            Text("Metronome Volume")
+                        }
+                        .onChange(of: metronomeVolume) { newValue in
+                            settings.metronomeVolume = newValue
+                        }
+                        Text(String(format: "%.0f%%", metronomeVolume * 100))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    // Tempo (BPM)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tempo (BPM)")
+                            .font(.headline)
+                        HStack {
+                            Stepper(value: $metronomeBPM, in: 40...200, step: 1) {
+                                Text("\(metronomeBPM) BPM")
+                            }
+                            .onChange(of: metronomeBPM) { newValue in
+                                // Save to settings if needed
+                            }
+                            Spacer()
+                            TextField("Custom BPM", value: $metronomeBPM, formatter: NumberFormatter())
+                                .keyboardType(.numberPad)
+                                .frame(width: 70)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onChange(of: metronomeBPM) { newValue in
+                                    if newValue < 40 { metronomeBPM = 40 }
+                                    if newValue > 200 { metronomeBPM = 200 }
+                                }
+                        }
+                    }
+                    // Time Signature
+                    VStack(alignment: .leading) {
+                        Text("Time Signature")
+                            .font(.headline)
+                        Picker("Time Signature", selection: $metronomeTimeSignature) {
+                            ForEach(timeSignatures, id: \.self) { sig in
+                                Text(sig).tag(sig)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .onChange(of: metronomeTimeSignature) { newValue in
+                            // Save to settings if needed
+                        }
+                    }
+                    Spacer()
+                }
+                .padding()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { showMetronomeSettings = false }
+                    }
+                }
+            }
         }
     }
     
@@ -205,6 +347,33 @@ struct SettingsView_Previews: PreviewProvider {
         NavigationView {
             SettingsView()
                 .environmentObject(UserSessionManager())
+        }
+    }
+}
+
+// MARK: - UIKit ImagePicker bridge
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: ImagePicker
+        init(_ parent: ImagePicker) { self.parent = parent }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let uiImage = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                parent.image = uiImage
+            }
+            picker.dismiss(animated: true)
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
         }
     }
 }

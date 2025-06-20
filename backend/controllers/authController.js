@@ -31,5 +31,18 @@ exports.login = async (req, res) => {
 exports.getProfile = async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ username: user.username, email: user.email });
+  res.json({ username: user.username, email: user.email, profileImage: user.profileImage });
+};
+
+exports.updateProfileImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.profileImage = `/profile_images/${req.file.filename}`;
+    await user.save();
+    res.json({ profileImage: user.profileImage });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }; 

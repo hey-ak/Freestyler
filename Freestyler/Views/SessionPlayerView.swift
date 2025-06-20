@@ -31,7 +31,6 @@ struct SessionPlayerView: View {
     @State private var recordingStartTime: TimeInterval = 0.0
     @State private var recordingPausedTime: TimeInterval = 0.0
     @State private var isRecordingPaused = false
-    @State private var playBeatOnly = false
     @State private var hasUnsavedRecording = false
     @State private var showRecordingOptions = false
 
@@ -45,6 +44,7 @@ struct SessionPlayerView: View {
     // MARK: - Metronome
     @StateObject private var metronomeManager = MetronomeManager()
     @State private var metronomeOn = false
+    @State private var metronomePlayer: AVAudioPlayer?
     
     var body: some View {
         ZStack {
@@ -106,24 +106,11 @@ struct SessionPlayerView: View {
                                 .toggleStyle(SwitchToggleStyle(tint: .blue))
                                 .onChange(of: metronomeOn) { value in
                                     if value {
-                                        metronomeManager.start(bpm: session.bpm)
+                                        playMetronome()
                                     } else {
-                                        metronomeManager.stop()
+                                        stopMetronome()
                                     }
                                 }
-                                Spacer()
-                            }
-                            HStack {
-                                Toggle(isOn: $playBeatOnly) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "music.note")
-                                            .foregroundStyle(accentGradient)
-                                        Text("Beat Only")
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-                                    }
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .purple))
                                 Spacer()
                             }
                         }
@@ -163,7 +150,7 @@ struct SessionPlayerView: View {
                         WaveformView(
                             progress: currentTime / totalDuration,
                             accentGradient: getWaveformGradient(),
-                            isPlaying: isPlaying && !playBeatOnly
+                            isPlaying: recordingManager.isRecording && !isRecordingPaused
                         )
                         .frame(height: 60)
                         .background(
@@ -172,12 +159,11 @@ struct SessionPlayerView: View {
                                 .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
                         )
                         .cornerRadius(14)
-                        .opacity(playBeatOnly ? 0.5 : 1.0)
+                        .opacity(0.5)
                         .padding(.vertical, 2)
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { gesture in
-                                    guard !playBeatOnly else { return }
                                     isSeeking = true
                                     let percentage = gesture.location.x / (totalDuration > 0 ? CGFloat(totalDuration) : 1.0)
                                     let newTime = percentage * totalDuration
@@ -185,7 +171,6 @@ struct SessionPlayerView: View {
                                     self.beatProgressSliderValue = newTime
                                 }
                                 .onEnded { gesture in
-                                    guard !playBeatOnly else { return }
                                     isSeeking = false
                                     let percentage = gesture.location.x / (totalDuration > 0 ? CGFloat(totalDuration) : 1.0)
                                     let seekTime = percentage * totalDuration
@@ -328,7 +313,7 @@ struct SessionPlayerView: View {
         hasUnsavedRecording = true
         isRecordingPaused = false
         
-        if !isPlaying && !playBeatOnly {
+        if !isPlaying {
             play()
         }
     }
@@ -345,7 +330,7 @@ struct SessionPlayerView: View {
     private func resumeRecording() {
         recordingManager.resumeRecording()
         isRecordingPaused = false
-        if !isPlaying && !playBeatOnly {
+        if !isPlaying {
             play()
         }
     }
@@ -436,7 +421,7 @@ struct SessionPlayerView: View {
             let vocalURL = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
         do {
             beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
-                if FileManager.default.fileExists(atPath: vocalURL.path) && !playBeatOnly {
+                if FileManager.default.fileExists(atPath: vocalURL.path) {
             vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
                 } else {
                     vocalPlayer = nil
@@ -469,19 +454,15 @@ struct SessionPlayerView: View {
                 return
             }
             beatPlayer.currentTime = currentTime
-            
-            if !playBeatOnly {
+            if !isPlaying {
                 vocalPlayer?.currentTime = currentTime
             }
-            
             if !beatPlayer.isPlaying {
                 beatPlayer.play()
             }
-            
-            if !playBeatOnly && !(vocalPlayer?.isPlaying ?? true) {
+            if !isPlaying && !(vocalPlayer?.isPlaying ?? true) {
             vocalPlayer?.play()
             }
-            
             isPlaying = true
             startTimer()
         }
@@ -493,7 +474,7 @@ struct SessionPlayerView: View {
             isPlaying = false
         } else {
         beatPlayer?.pause()
-            if !playBeatOnly {
+            if !isPlaying {
         vocalPlayer?.pause()
             }
         isPlaying = false
@@ -510,7 +491,7 @@ struct SessionPlayerView: View {
             beatProgressSliderValue = 0.0
         } else {
         beatPlayer?.stop()
-            if !playBeatOnly {
+            if !isPlaying {
         vocalPlayer?.stop()
             }
         isPlaying = false
@@ -529,9 +510,7 @@ struct SessionPlayerView: View {
             beatProgressSliderValue = newTime
         } else {
             beatPlayer?.currentTime = newTime
-            if !playBeatOnly {
-                vocalPlayer?.currentTime = newTime
-            }
+            vocalPlayer?.currentTime = newTime
             currentTime = newTime
             beatProgressSliderValue = newTime
             if !isPlaying {
@@ -586,6 +565,38 @@ struct SessionPlayerView: View {
                 print("Error deleting vocal recording: \(error.localizedDescription)")
             }
         }
+    }
+
+    private func playMetronome() {
+        let soundName = settings.metronomeSound.replacingOccurrences(of: ".mp3", with: "")
+        let bundleURL = Bundle.main.url(forResource: soundName, withExtension: "mp3")
+        let fileURL = getDocumentsDirectory().appendingPathComponent("beats/\(settings.metronomeSound)")
+        let metronomeURL: URL?
+        if let bundleURL = bundleURL {
+            metronomeURL = bundleURL
+        } else if FileManager.default.fileExists(atPath: fileURL.path) {
+            metronomeURL = fileURL
+        } else {
+            metronomeURL = nil
+        }
+        guard let url = metronomeURL else {
+            print("Metronome sound not found")
+            return
+        }
+        do {
+            metronomePlayer = try AVAudioPlayer(contentsOf: url)
+            metronomePlayer?.numberOfLoops = -1 // Loop until stopped
+            metronomePlayer?.volume = Float(settings.metronomeVolume)
+            metronomePlayer?.prepareToPlay()
+            metronomePlayer?.play()
+        } catch {
+            print("Failed to play metronome: \(error)")
+        }
+    }
+
+    private func stopMetronome() {
+        metronomePlayer?.stop()
+        metronomePlayer = nil
     }
 }
 
@@ -693,7 +704,6 @@ struct RecordingControlsView: View {
                 }
             }
             
-            // Additional Actions (show when recording exists)
             // Additional Actions (show when recording exists)
             if hasUnsavedRecording || recordingManager.recordedFileURL != nil {
                 HStack(spacing: 16) {
