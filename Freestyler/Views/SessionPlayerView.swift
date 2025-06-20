@@ -31,18 +31,16 @@ struct SessionPlayerView: View {
     @State private var recordingStartTime: TimeInterval = 0.0
     @State private var recordingPausedTime: TimeInterval = 0.0
     @State private var isRecordingPaused = false
-    @State private var playBeatOnly = false // New state for beat-only playback
+    @State private var playBeatOnly = false
     @State private var hasUnsavedRecording = false
     @State private var showRecordingOptions = false
 
     // MARK: - Playback Control Constants
     let seekInterval: TimeInterval = 10.0
 
-    // MARK: - Unified Accent Colors/Gradients
-    let primaryAccentGradient = LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing)
-    let secondaryAccentGradient = LinearGradient(colors: [Color.red, Color.orange], startPoint: .leading, endPoint: .trailing)
-    let successAccentGradient = LinearGradient(colors: [Color.green, Color.mint], startPoint: .leading, endPoint: .trailing)
-    let warningAccentGradient = LinearGradient(colors: [Color.orange, Color.yellow], startPoint: .leading, endPoint: .trailing)
+    // MARK: - Consistent Color Scheme (Only 2 colors)
+    let primaryGradient = LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing)
+    let accentGradient = LinearGradient(colors: [Color.purple, Color.pink], startPoint: .leading, endPoint: .trailing)
 
     // MARK: - Metronome
     @StateObject private var metronomeManager = MetronomeManager()
@@ -82,13 +80,13 @@ struct SessionPlayerView: View {
                 VStack(spacing: 28) {
                     // Session Info
                     VStack(spacing: 8) {
-            Text(session.displayName ?? session.beatName)
+                        Text(session.displayName ?? session.beatName)
                             .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundStyle(LinearGradient(colors: [.primary, .purple], startPoint: .leading, endPoint: .trailing))
+                            .foregroundStyle(primaryGradient)
                             .multilineTextAlignment(.center)
                         Text("\(session.scale) | \(session.bpm) BPM")
                             .font(.headline)
-                .foregroundColor(.secondary)
+                            .foregroundColor(.secondary)
                     }
                     .padding(.bottom, 10)
 
@@ -99,7 +97,7 @@ struct SessionPlayerView: View {
                                 Toggle(isOn: $metronomeOn) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "metronome")
-                                            .foregroundColor(.blue)
+                                            .foregroundStyle(primaryGradient)
                                         Text("Metronome")
                                             .font(.headline)
                                             .foregroundColor(.primary)
@@ -119,13 +117,13 @@ struct SessionPlayerView: View {
                                 Toggle(isOn: $playBeatOnly) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "music.note")
-                                            .foregroundColor(.orange)
+                                            .foregroundStyle(accentGradient)
                                         Text("Beat Only")
                                             .font(.headline)
                                             .foregroundColor(.primary)
                                     }
                                 }
-                                .toggleStyle(SwitchToggleStyle(tint: .orange))
+                                .toggleStyle(SwitchToggleStyle(tint: .purple))
                                 Spacer()
                             }
                         }
@@ -156,38 +154,15 @@ struct SessionPlayerView: View {
                                 .foregroundColor(.primary)
                             Spacer()
                             // Recording Status Indicator
-                            if recordingManager.isRecording {
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 12, height: 12)
-                                        .shadow(color: .red.opacity(0.7), radius: 8, x: 0, y: 0)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white.opacity(0.7), lineWidth: 2)
-                                        )
-                                        .scaleEffect(isPlaying ? 1.3 : 1.0)
-                                        .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: isPlaying)
-                                    Text("REC")
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.red)
-                                }
-                            } else if isRecordingPaused {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "pause.circle.fill")
-                                        .foregroundColor(.orange)
-                                        .font(.caption)
-                                    Text("PAUSED")
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.orange)
-                                }
-                            }
+                            RecordingStatusIndicator(
+                                isRecording: recordingManager.isRecording,
+                                isPaused: isRecordingPaused,
+                                isPlaying: isPlaying
+                            )
                         }
                         WaveformView(
                             progress: currentTime / totalDuration,
-                            accentGradient: recordingManager.isRecording ? secondaryAccentGradient : primaryAccentGradient,
+                            accentGradient: getWaveformGradient(),
                             isPlaying: isPlaying && !playBeatOnly
                         )
                         .frame(height: 60)
@@ -230,7 +205,7 @@ struct SessionPlayerView: View {
                         if recordingManager.isRecording || isRecordingPaused {
                             Text("Rec: \(formatTime(currentTime - recordingStartTime))")
                                 .font(.caption.monospacedDigit())
-                                .foregroundColor(recordingManager.isRecording ? .red : .orange)
+                                .foregroundStyle(recordingManager.isRecording ? primaryGradient : accentGradient)
                                 .fontWeight(.medium)
                         }
                         Spacer()
@@ -241,138 +216,25 @@ struct SessionPlayerView: View {
                     .padding(.horizontal, 40)
                     .padding(.bottom, 10)
 
-                    // MARK: - Playback Controls
-                    VStack(spacing: 24) {
-                        // Primary Recording Control Row
-                        HStack(spacing: 24) {
-                            // Main Record/Stop Button
-                            Button(action: {
-                                handlePrimaryRecordingAction()
-                            }) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: getRecordingButtonIcon())
-                                        .font(.system(size: 32, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    Text(getRecordingButtonText())
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                }
-                                .padding(.vertical, 16)
-                                .padding(.horizontal, 32)
-                                .background(getRecordingButtonGradient())
-                                .cornerRadius(28)
-                                .shadow(color: getRecordingButtonShadowColor(), radius: 10, x: 0, y: 5)
-                            }
-                            .disabled(isPlaying && !recordingManager.isRecording && !isRecordingPaused)
-                            // Pause/Resume Button (show when recording or paused)
-                            if recordingManager.isRecording || isRecordingPaused {
-                                Button(action: {
-                                    if recordingManager.isRecording {
-                                        pauseRecording()
-                                    } else if isRecordingPaused {
-                                        resumeRecording()
-                                    }
-                                }) {
-                                    Image(systemName: isRecordingPaused ? "play.circle.fill" : "pause.circle.fill")
-                                        .font(.system(size: 44))
-                                        .foregroundColor(isRecordingPaused ? .green : .orange)
-                                        .shadow(color: isRecordingPaused ? .green.opacity(0.2) : .orange.opacity(0.2), radius: 8, x: 0, y: 2)
-                                }
-                            }
-                            // Delete Button (only show if there's a recording)
-                            if recordingManager.recordedFileURL != nil || hasUnsavedRecording {
-                                Button(action: { showDeleteAlert = true }) {
-                                    Image(systemName: "trash.circle.fill")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.red)
-                                        .shadow(color: .red.opacity(0.15), radius: 6, x: 0, y: 2)
-                                }
-                            }
-                        }
-                        // Secondary Action Row
-                        if hasUnsavedRecording || (recordingManager.recordedFileURL != nil) {
-                            HStack(spacing: 16) {
-                                // Save Button
-                                if hasUnsavedRecording {
-                                    Button(action: {
-                                        recordingName = session.displayName ?? session.beatName
-                                        showSaveDialog = true
-                                    }) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "square.and.arrow.down.fill")
-                                                .font(.system(size: 18))
-                                            Text("Save Recording")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                        }
-                                        .foregroundColor(.white)
-                                        .padding(.vertical, 10)
-                                        .padding(.horizontal, 20)
-                                        .background(successAccentGradient)
-                                        .cornerRadius(16)
-                                        .shadow(color: .green.opacity(0.15), radius: 6, x: 0, y: 2)
-                                    }
-                                }
-                                // Options Button
-                                Button(action: { showRecordingOptions = true }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "ellipsis.circle.fill")
-                                            .font(.system(size: 18))
-                                        Text("Options")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 10)
-                                    .padding(.horizontal, 20)
-                                    .background(warningAccentGradient)
-                                    .cornerRadius(16)
-                                    .shadow(color: .orange.opacity(0.15), radius: 6, x: 0, y: 2)
-                                }
-                            }
-                        }
-                        // Recording Status Information
-                        VStack(spacing: 6) {
-                            if recordingManager.isRecording {
-                                HStack {
-                                    Image(systemName: "waveform")
-                                        .foregroundColor(.red)
-                                    Text("Recording in progress...")
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                        .fontWeight(.medium)
-                                }
-                            } else if isRecordingPaused {
-                                HStack {
-                                    Image(systemName: "pause.circle")
-                                        .foregroundColor(.orange)
-                                    Text("Recording paused - tap resume to continue")
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                        .fontWeight(.medium)
-                                }
-                            } else if let url = recordingManager.recordedFileURL {
-                                HStack {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                    Text("Vocal saved: \(url.lastPathComponent)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            } else if hasUnsavedRecording {
-                                HStack {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundColor(.orange)
-                                    Text("Unsaved recording - tap save to keep it")
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                        .fontWeight(.medium)
-                                }
-                            }
-                        }
-                    }
+                    // MARK: - Seamless Recording Controls
+                    RecordingControlsView(
+                        recordingManager: recordingManager,
+                        isRecordingPaused: $isRecordingPaused,
+                        hasUnsavedRecording: $hasUnsavedRecording,
+                        isPlaying: isPlaying,
+                        primaryGradient: primaryGradient,
+                        accentGradient: accentGradient,
+                        onStartRecording: { initiateRecording() },
+                        onPauseRecording: { pauseRecording() },
+                        onResumeRecording: { resumeRecording() },
+                        onStopRecording: { stopRecording() },
+                        onDeleteRecording: { showDeleteAlert = true },
+                        onSaveRecording: {
+                            recordingName = session.displayName ?? session.beatName
+                            showSaveDialog = true
+                        },
+                        onShowOptions: { showRecordingOptions = true }
+                    )
                     .padding(.top, 24)
                 }
                 .padding(32)
@@ -443,34 +305,23 @@ struct SessionPlayerView: View {
         }
     }
     
-    // MARK: - Enhanced Recording Methods
-    private func handlePrimaryRecordingAction() {
+    // MARK: - Helper Methods
+    private func getWaveformGradient() -> LinearGradient {
         if recordingManager.isRecording {
-            // Stop recording
-            stopRecording()
+            return primaryGradient
         } else if isRecordingPaused {
-            // Stop completely
-            stopRecording()
+            return accentGradient
         } else {
-            // Start new recording
-            isRecordingInitiated = true
-            showCountdown = true
+            return primaryGradient
         }
     }
     
-    private func handleRecordingPauseResume() {
-        if recordingManager.isRecording {
-            // Pause recording
-            pauseRecording()
-        } else if isRecordingPaused {
-            // Resume recording and playback
-            resumeRecording()
-            // Always start playback when resuming recording, regardless of current state
-            if !playBeatOnly {
-                play()
-            }
-        }
+    // MARK: - Seamless Recording Methods
+    private func initiateRecording() {
+        isRecordingInitiated = true
+        showCountdown = true
     }
+    
     private func startRecording() {
         recordingStartTime = currentTime
         recordingManager.startRecording()
@@ -486,21 +337,14 @@ struct SessionPlayerView: View {
         recordingManager.pauseRecording()
         recordingPausedTime = currentTime
         isRecordingPaused = true
-        // Optionally pause playback too
         if isPlaying {
             pause()
         }
     }
     
     private func resumeRecording() {
-        print("[DEBUG] Resuming recording and playback")
         recordingManager.resumeRecording()
         isRecordingPaused = false
-        // Ensure UI updates immediately
-        DispatchQueue.main.async {
-            // If you have a published isRecordingPaused or isRecording, update here
-        }
-        // Resume playback
         if !isPlaying && !playBeatOnly {
             play()
         }
@@ -513,7 +357,6 @@ struct SessionPlayerView: View {
     }
     
     private func saveRecording() {
-        // Implement save logic here
         if let recordingURL = recordingManager.recordedFileURL {
             let documentsPath = getDocumentsDirectory()
             let savedURL = documentsPath.appendingPathComponent("\(recordingName).m4a")
@@ -537,68 +380,23 @@ struct SessionPlayerView: View {
     }
     
     private func exportRecording() {
-        // Implement export functionality
         print("Export recording functionality")
     }
     
     private func shareRecording() {
-        // Implement share functionality
         print("Share recording functionality")
     }
     
     private func startNewRecording() {
         deleteVocalRecording()
         hasUnsavedRecording = false
-        isRecordingInitiated = true
-        showCountdown = true
+        initiateRecording()
     }
     
-    // MARK: - Recording Button Helpers
-    private func getRecordingButtonIcon() -> String {
-        if recordingManager.isRecording {
-            return "stop.circle.fill"
-        } else if isRecordingPaused {
-            return "stop.circle.fill"
-        } else {
-            return "mic.fill"
-        }
-    }
-    
-    private func getRecordingButtonText() -> String {
-        if recordingManager.isRecording {
-            return "Stop"
-        } else if isRecordingPaused {
-            return "Stop"
-        } else {
-            return "Record"
-        }
-    }
-    
-    private func getRecordingButtonGradient() -> AnyShapeStyle {
-        if recordingManager.isRecording {
-            return AnyShapeStyle(secondaryAccentGradient)
-        } else if isRecordingPaused {
-            return AnyShapeStyle(warningAccentGradient)
-        } else {
-            return AnyShapeStyle(primaryAccentGradient)
-        }
-    }
-    
-    private func getRecordingButtonShadowColor() -> Color {
-        if recordingManager.isRecording {
-            return Color.red.opacity(0.3)
-        } else if isRecordingPaused {
-            return Color.orange.opacity(0.3)
-        } else {
-            return Color.blue.opacity(0.3)
-        }
-    }
-    
-    // MARK: - Audio Playback Methods (Enhanced)
+    // MARK: - Audio Playback Methods (Preserved existing functionality)
     private func setupAudioPlayers() {
         let beatFile = session.beatFileName
         if beatFile.hasPrefix("http://") || beatFile.hasPrefix("https://") {
-            // Remote file: use AVPlayer
             isRemote = true
             let url = URL(string: beatFile)!
             avPlayer = AVPlayer(url: url)
@@ -615,7 +413,6 @@ struct SessionPlayerView: View {
                 self.beatProgressSliderValue = self.currentTime
             }
         } else {
-            // Local file: use AVAudioPlayer
             isRemote = false
             let beatURL = Bundle.main.url(forResource: beatFile, withExtension: nil) ?? getDocumentsDirectory().appendingPathComponent(beatFile)
             print("Trying to load beat from: \(beatURL.path)")
@@ -624,15 +421,15 @@ struct SessionPlayerView: View {
                 return
             }
             let vocalURL = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
-        do {
-            beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
+            do {
+                beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
                 if FileManager.default.fileExists(atPath: vocalURL.path) && !playBeatOnly {
-            vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
+                    vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
                 } else {
                     vocalPlayer = nil
                 }
-            beatPlayer?.prepareToPlay()
-            vocalPlayer?.prepareToPlay()
+                beatPlayer?.prepareToPlay()
+                vocalPlayer?.prepareToPlay()
                 totalDuration = beatPlayer?.duration ?? 0.0
             } catch {
                 print("Failed to set up players: \(error.localizedDescription)")
@@ -660,7 +457,6 @@ struct SessionPlayerView: View {
             }
             beatPlayer.currentTime = currentTime
             
-            // Only play vocal if not in beat-only mode
             if !playBeatOnly {
                 vocalPlayer?.currentTime = currentTime
             }
@@ -670,7 +466,7 @@ struct SessionPlayerView: View {
             }
             
             if !playBeatOnly && !(vocalPlayer?.isPlaying ?? true) {
-            vocalPlayer?.play()
+                vocalPlayer?.play()
             }
             
             isPlaying = true
@@ -683,12 +479,12 @@ struct SessionPlayerView: View {
             avPlayer?.pause()
             isPlaying = false
         } else {
-        beatPlayer?.pause()
+            beatPlayer?.pause()
             if !playBeatOnly {
-        vocalPlayer?.pause()
+                vocalPlayer?.pause()
             }
-        isPlaying = false
-        stopTimer()
+            isPlaying = false
+            stopTimer()
         }
     }
     
@@ -700,12 +496,12 @@ struct SessionPlayerView: View {
             currentTime = 0.0
             beatProgressSliderValue = 0.0
         } else {
-        beatPlayer?.stop()
+            beatPlayer?.stop()
             if !playBeatOnly {
-        vocalPlayer?.stop()
+                vocalPlayer?.stop()
             }
-        isPlaying = false
-        stopTimer()
+            isPlaying = false
+            stopTimer()
             currentTime = 0.0
             beatProgressSliderValue = 0.0
             isRecordingInitiated = false
@@ -775,6 +571,296 @@ struct SessionPlayerView: View {
                 print("Vocal recording deleted successfully.")
             } catch {
                 print("Error deleting vocal recording: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+// MARK: - Recording Status Indicator Component
+struct RecordingStatusIndicator: View {
+    let isRecording: Bool
+    let isPaused: Bool
+    let isPlaying: Bool
+    
+    var body: some View {
+        Group {
+            if isRecording {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 12, height: 12)
+                        .shadow(color: .red.opacity(0.7), radius: 8, x: 0, y: 0)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.7), lineWidth: 2)
+                        )
+                        .scaleEffect(isPlaying ? 1.3 : 1.0)
+                        .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: isPlaying)
+                    Text("REC")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                }
+            } else if isPaused {
+                HStack(spacing: 4) {
+                    Image(systemName: "pause.circle.fill")
+                        .foregroundColor(.purple)
+                        .font(.caption)
+                    Text("PAUSED")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Seamless Recording Controls Component
+struct RecordingControlsView: View {
+    @ObservedObject var recordingManager: RecordingManager
+    @Binding var isRecordingPaused: Bool
+    @Binding var hasUnsavedRecording: Bool
+    let isPlaying: Bool
+    let primaryGradient: LinearGradient
+    let accentGradient: LinearGradient
+    
+    let onStartRecording: () -> Void
+    let onPauseRecording: () -> Void
+    let onResumeRecording: () -> Void
+    let onStopRecording: () -> Void
+    let onDeleteRecording: () -> Void
+    let onSaveRecording: () -> Void
+    let onShowOptions: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Main Recording Control
+            HStack(spacing: 20) {
+                // Primary Action Button
+                MainRecordingButton(
+                    isRecording: recordingManager.isRecording,
+                    isPaused: isRecordingPaused,
+                    primaryGradient: primaryGradient,
+                    accentGradient: accentGradient,
+                    onAction: {
+                        if recordingManager.isRecording {
+                            onStopRecording()
+                        } else if isRecordingPaused {
+                            onStopRecording()
+                        } else {
+                            onStartRecording()
+                        }
+                    }
+                )
+                
+                // Secondary Actions (show when recording is active)
+                if recordingManager.isRecording || isRecordingPaused {
+                    HStack(spacing: 16) {
+                        // Pause/Resume Button
+                        SecondaryActionButton(
+                            icon: isRecordingPaused ? "play.circle.fill" : "pause.circle.fill",
+                            gradient: isRecordingPaused ? primaryGradient : accentGradient,
+                            action: {
+                                if isRecordingPaused {
+                                    onResumeRecording()
+                                } else {
+                                    onPauseRecording()
+                                }
+                            }
+                        )
+                        
+                        // Delete Button
+                        SecondaryActionButton(
+                            icon: "trash.circle.fill",
+                            gradient: LinearGradient(colors: [.red.opacity(0.8), .red], startPoint: .leading, endPoint: .trailing),
+                            action: onDeleteRecording
+                        )
+                    }
+                }
+            }
+            
+            // Additional Actions (show when recording exists)
+            // Additional Actions (show when recording exists)
+            if hasUnsavedRecording || recordingManager.recordedFileURL != nil {
+                HStack(spacing: 16) {
+                    if hasUnsavedRecording {
+                        SessionActionButton(
+                            title: "Save",
+                            icon: "square.and.arrow.down.fill",
+                            gradient: primaryGradient,
+                            action: onSaveRecording
+                        )
+                    }
+                    
+                    SessionActionButton(
+                        title: "Options",
+                        icon: "ellipsis.circle.fill",
+                        gradient: accentGradient,
+                        action: onShowOptions
+                    )
+                }
+            }
+            // Status Information
+            RecordingStatusInfo(
+                isRecording: recordingManager.isRecording,
+                isPaused: isRecordingPaused,
+                recordedFileURL: recordingManager.recordedFileURL,
+                hasUnsavedRecording: hasUnsavedRecording,
+                primaryGradient: primaryGradient,
+                accentGradient: accentGradient
+            )
+        }
+    }
+}
+
+// MARK: - Main Recording Button Component
+struct MainRecordingButton: View {
+    let isRecording: Bool
+    let isPaused: Bool
+    let primaryGradient: LinearGradient
+    let accentGradient: LinearGradient
+    let onAction: () -> Void
+    
+    private var buttonIcon: String {
+        if isRecording || isPaused {
+            return "stop.circle.fill"
+        } else {
+            return "mic.fill"
+        }
+    }
+    
+    private var buttonText: String {
+        if isRecording || isPaused {
+            return "Stop"
+        } else {
+            return "Record"
+        }
+    }
+    
+    private var buttonGradient: LinearGradient {
+        if isRecording {
+            return primaryGradient
+        } else if isPaused {
+            return accentGradient
+        } else {
+            return primaryGradient
+        }
+    }
+    
+    var body: some View {
+        Button(action: onAction) {
+            HStack(spacing: 12) {
+                Image(systemName: buttonIcon)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+                Text(buttonText)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+            }
+            .padding(.vertical, 18)
+            .padding(.horizontal, 36)
+            .background(buttonGradient)
+            .cornerRadius(30)
+            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+        }
+        .scaleEffect(isRecording ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isRecording)
+    }
+}
+
+// MARK: - Secondary Action Button Component
+struct SecondaryActionButton: View {
+    let icon: String
+    let gradient: LinearGradient
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundColor(.white)
+                .frame(width: 50, height: 50)
+                .background(gradient)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        }
+    }
+}
+
+// MARK: - Action Button Component
+struct SessionActionButton: View {
+    let title: String
+    let icon: String
+    let gradient: LinearGradient
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(.white)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 24)
+            .background(gradient)
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
+        }
+    }
+}
+
+// MARK: - Recording Status Info Component
+struct RecordingStatusInfo: View {
+    let isRecording: Bool
+    let isPaused: Bool
+    let recordedFileURL: URL?
+    let hasUnsavedRecording: Bool
+    let primaryGradient: LinearGradient
+    let accentGradient: LinearGradient
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            if isRecording {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform")
+                        .foregroundStyle(primaryGradient)
+                    Text("Recording in progress...")
+                        .font(.caption)
+                        .foregroundStyle(primaryGradient)
+                        .fontWeight(.medium)
+                }
+            } else if isPaused {
+                HStack(spacing: 8) {
+                    Image(systemName: "pause.circle")
+                        .foregroundStyle(accentGradient)
+                    Text("Recording paused - tap resume to continue")
+                        .font(.caption)
+                        .foregroundStyle(accentGradient)
+                        .fontWeight(.medium)
+                }
+            } else if let url = recordedFileURL {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(primaryGradient)
+                    Text("Vocal saved: \(url.lastPathComponent)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if hasUnsavedRecording {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(accentGradient)
+                    Text("Unsaved recording - tap save to keep it")
+                        .font(.caption)
+                        .foregroundStyle(accentGradient)
+                        .fontWeight(.medium)
+                }
             }
         }
     }
@@ -866,10 +952,6 @@ struct WaveformView: View {
     }
 }
 
-// MARK: - Enhanced RecordingManager
-
-
-
 // MARK: - Preview Provider
 struct SessionPlayerView_Previews: PreviewProvider {
     static var previews: some View {
@@ -885,4 +967,4 @@ struct SessionPlayerView_Previews: PreviewProvider {
         )
         SessionPlayerView(session: dummy)
     }
-} 
+}
