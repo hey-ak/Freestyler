@@ -1,15 +1,34 @@
 import Foundation
 import AVFoundation
+import Combine
 
 class MetronomeManager: ObservableObject {
     private var timer: Timer?
     private var audioPlayer: AVAudioPlayer?
     @Published var isTicking: Bool = false
     var onTick: (() -> Void)?
+    private var settings = SettingsModel.shared
+    private var cancellables = Set<AnyCancellable>()
     
-    func start(bpm: Int) {
+    init() {
+        settings.$metronomeBPM
+            .sink { [weak self] newBPM in
+                guard let self = self, self.isTicking else { return }
+                self.start(bpm: newBPM)
+            }
+            .store(in: &cancellables)
+        // Optionally observe time signature for future use
+        settings.$metronomeTimeSignature
+            .sink { [weak self] newSignature in
+                // Future: update metronome pattern if needed
+            }
+            .store(in: &cancellables)
+    }
+    
+    func start(bpm: Int? = nil) {
         stop()
-        let interval = 60.0 / Double(bpm)
+        let bpmToUse = bpm ?? settings.metronomeBPM
+        let interval = 60.0 / Double(bpmToUse)
         isTicking = true
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.playClick()
@@ -37,5 +56,9 @@ class MetronomeManager: ObservableObject {
         } catch {
             print("Failed to play metronome click: \(error)")
         }
+    }
+    
+    deinit {
+        cancellables.forEach { $0.cancel() }
     }
 } 

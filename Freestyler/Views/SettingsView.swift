@@ -11,12 +11,11 @@ struct SettingsView: View {
     @State private var metronomeVolume: Double = SettingsModel.shared.metronomeVolume
     @State private var metronomeSound: String = SettingsModel.shared.metronomeSound
     @State private var showMetronomeSettings = false
-    @State private var metronomeBPM: Int = 90 // Default value, can be loaded from SettingsModel
-    @State private var metronomeTimeSignature: String = "4/4"
+    @State private var bpmText: String = String(SettingsModel.shared.metronomeBPM)
     let timeSignatures = ["4/4", "3/4", "2/4", "6/8"]
     
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
                 // Profile Section
                 if let username = sessionManager.username, let email = sessionManager.email {
@@ -214,36 +213,46 @@ struct SettingsView: View {
                         Text("Tempo (BPM)")
                             .font(.headline)
                         HStack {
-                            Stepper(value: $metronomeBPM, in: 40...200, step: 1) {
-                                Text("\(metronomeBPM) BPM")
-                            }
-                            .onChange(of: metronomeBPM) { newValue in
-                                // Save to settings if needed
+                            Stepper(value: $settings.metronomeBPM, in: 40...200, step: 1) {
+                                Text("\(settings.metronomeBPM) BPM")
                             }
                             Spacer()
-                            TextField("Custom BPM", value: $metronomeBPM, formatter: NumberFormatter())
-                                .keyboardType(.numberPad)
-                                .frame(width: 70)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: metronomeBPM) { newValue in
-                                    if newValue < 40 { metronomeBPM = 40 }
-                                    if newValue > 200 { metronomeBPM = 200 }
+                            TextField("", text: $bpmText, onCommit: {
+                                if let bpm = Int(bpmText), bpm >= 40, bpm <= 200 {
+                                    settings.metronomeBPM = bpm
+                                } else if let bpm = Int(bpmText), bpm < 40 {
+                                    settings.metronomeBPM = 40
+                                    bpmText = "40"
+                                } else if let bpm = Int(bpmText), bpm > 200 {
+                                    settings.metronomeBPM = 200
+                                    bpmText = "200"
+                                } else {
+                                    bpmText = String(settings.metronomeBPM)
                                 }
+                            })
+                            .keyboardType(.numberPad)
+                            .frame(width: 70)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onChange(of: bpmText) { newValue in
+                                if let bpm = Int(newValue), bpm >= 40, bpm <= 200 {
+                                    settings.metronomeBPM = bpm
+                                }
+                            }
+                            .onChange(of: settings.metronomeBPM) { newValue in
+                                bpmText = String(newValue)
+                            }
                         }
                     }
                     // Time Signature
                     VStack(alignment: .leading) {
                         Text("Time Signature")
                             .font(.headline)
-                        Picker("Time Signature", selection: $metronomeTimeSignature) {
+                        Picker("Time Signature", selection: $settings.metronomeTimeSignature) {
                             ForEach(timeSignatures, id: \.self) { sig in
                                 Text(sig).tag(sig)
                             }
                         }
                         .pickerStyle(SegmentedPickerStyle())
-                        .onChange(of: metronomeTimeSignature) { newValue in
-                            // Save to settings if needed
-                        }
                     }
                     Spacer()
                 }

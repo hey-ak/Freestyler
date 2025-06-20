@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import Combine
 
 struct SessionPlayerView: View {
     let session: SessionModel
@@ -45,6 +46,7 @@ struct SessionPlayerView: View {
     @StateObject private var metronomeManager = MetronomeManager()
     @State private var metronomeOn = false
     @State private var metronomePlayer: AVAudioPlayer?
+    @State private var cancellables = Set<AnyCancellable>()
     
     var body: some View {
         ZStack {
@@ -280,6 +282,14 @@ struct SessionPlayerView: View {
             )
         }
         .onAppear(perform: setupAudioPlayers)
+        .onAppear {
+            // Observe BPM changes and restart metronome if needed
+            settings.$metronomeBPM.sink { newBPM in
+                if metronomeOn {
+                    metronomeManager.start(bpm: newBPM)
+                }
+            }.store(in: &cancellables)
+        }
         .onDisappear {
             stop()
             metronomeManager.stop()
@@ -568,30 +578,7 @@ struct SessionPlayerView: View {
     }
 
     private func playMetronome() {
-        let soundName = settings.metronomeSound.replacingOccurrences(of: ".mp3", with: "")
-        let bundleURL = Bundle.main.url(forResource: soundName, withExtension: "mp3")
-        let fileURL = getDocumentsDirectory().appendingPathComponent("beats/\(settings.metronomeSound)")
-        let metronomeURL: URL?
-        if let bundleURL = bundleURL {
-            metronomeURL = bundleURL
-        } else if FileManager.default.fileExists(atPath: fileURL.path) {
-            metronomeURL = fileURL
-        } else {
-            metronomeURL = nil
-        }
-        guard let url = metronomeURL else {
-            print("Metronome sound not found")
-            return
-        }
-        do {
-            metronomePlayer = try AVAudioPlayer(contentsOf: url)
-            metronomePlayer?.numberOfLoops = -1 // Loop until stopped
-            metronomePlayer?.volume = Float(settings.metronomeVolume)
-            metronomePlayer?.prepareToPlay()
-            metronomePlayer?.play()
-        } catch {
-            print("Failed to play metronome: \(error)")
-        }
+        metronomeManager.start(bpm: settings.metronomeBPM)
     }
 
     private func stopMetronome() {
