@@ -80,13 +80,13 @@ struct SessionPlayerView: View {
                 VStack(spacing: 28) {
                     // Session Info
                     VStack(spacing: 8) {
-                        Text(session.displayName ?? session.beatName)
+            Text(session.displayName ?? session.beatName)
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundStyle(primaryGradient)
                             .multilineTextAlignment(.center)
                         Text("\(session.scale) | \(session.bpm) BPM")
                             .font(.headline)
-                            .foregroundColor(.secondary)
+                .foregroundColor(.secondary)
                     }
                     .padding(.bottom, 10)
 
@@ -354,13 +354,13 @@ struct SessionPlayerView: View {
         recordingManager.stopRecording()
         isRecordingPaused = false
         hasUnsavedRecording = true
+        stop()
     }
     
     private func saveRecording() {
         if let recordingURL = recordingManager.recordedFileURL {
             let documentsPath = getDocumentsDirectory()
             let savedURL = documentsPath.appendingPathComponent("\(recordingName).m4a")
-            
             do {
                 if FileManager.default.fileExists(atPath: savedURL.path) {
                     try FileManager.default.removeItem(at: savedURL)
@@ -368,6 +368,19 @@ struct SessionPlayerView: View {
                 try FileManager.default.copyItem(at: recordingURL, to: savedURL)
                 hasUnsavedRecording = false
                 print("Recording saved as: \(recordingName)")
+                // Add to sessions
+                let newSession = SessionModel(
+                    beatName: session.beatName,
+                    beatFileName: session.beatFileName,
+                    vocalFileName: "\(recordingName).m4a",
+                    scale: session.scale,
+                    bpm: session.bpm,
+                    duration: totalDuration,
+                    timestamp: Date(),
+                    displayName: recordingName
+                )
+                let store = SessionStore()
+                store.addSession(newSession)
             } catch {
                 print("Error saving recording: \(error)")
             }
@@ -421,15 +434,15 @@ struct SessionPlayerView: View {
                 return
             }
             let vocalURL = getDocumentsDirectory().appendingPathComponent(session.vocalFileName)
-            do {
-                beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
+        do {
+            beatPlayer = try AVAudioPlayer(contentsOf: beatURL)
                 if FileManager.default.fileExists(atPath: vocalURL.path) && !playBeatOnly {
-                    vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
+            vocalPlayer = try AVAudioPlayer(contentsOf: vocalURL)
                 } else {
                     vocalPlayer = nil
                 }
-                beatPlayer?.prepareToPlay()
-                vocalPlayer?.prepareToPlay()
+            beatPlayer?.prepareToPlay()
+            vocalPlayer?.prepareToPlay()
                 totalDuration = beatPlayer?.duration ?? 0.0
             } catch {
                 print("Failed to set up players: \(error.localizedDescription)")
@@ -466,7 +479,7 @@ struct SessionPlayerView: View {
             }
             
             if !playBeatOnly && !(vocalPlayer?.isPlaying ?? true) {
-                vocalPlayer?.play()
+            vocalPlayer?.play()
             }
             
             isPlaying = true
@@ -479,12 +492,12 @@ struct SessionPlayerView: View {
             avPlayer?.pause()
             isPlaying = false
         } else {
-            beatPlayer?.pause()
+        beatPlayer?.pause()
             if !playBeatOnly {
-                vocalPlayer?.pause()
+        vocalPlayer?.pause()
             }
-            isPlaying = false
-            stopTimer()
+        isPlaying = false
+        stopTimer()
         }
     }
     
@@ -496,12 +509,12 @@ struct SessionPlayerView: View {
             currentTime = 0.0
             beatProgressSliderValue = 0.0
         } else {
-            beatPlayer?.stop()
+        beatPlayer?.stop()
             if !playBeatOnly {
-                vocalPlayer?.stop()
+        vocalPlayer?.stop()
             }
-            isPlaying = false
-            stopTimer()
+        isPlaying = false
+        stopTimer()
             currentTime = 0.0
             beatProgressSliderValue = 0.0
             isRecordingInitiated = false
@@ -730,14 +743,6 @@ struct MainRecordingButton: View {
         }
     }
     
-    private var buttonText: String {
-        if isRecording || isPaused {
-            return "Stop"
-        } else {
-            return "Record"
-        }
-    }
-    
     private var buttonGradient: LinearGradient {
         if isRecording {
             return primaryGradient
@@ -750,22 +755,15 @@ struct MainRecordingButton: View {
     
     var body: some View {
         Button(action: onAction) {
-            HStack(spacing: 12) {
-                Image(systemName: buttonIcon)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-                Text(buttonText)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-            }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 36)
-            .background(buttonGradient)
-            .cornerRadius(30)
-            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+            Image(systemName: buttonIcon)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 80, height: 80)
+                .background(buttonGradient)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
         }
-        .scaleEffect(isRecording ? 1.05 : 1.0)
+        .scaleEffect(isRecording ? 1.08 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isRecording)
     }
 }
@@ -780,11 +778,15 @@ struct SecondaryActionButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 24, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .frame(width: 50, height: 50)
-                .background(gradient)
+                .background(.ultraThinMaterial)
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .overlay(
+                    Circle()
+                        .stroke(gradient, lineWidth: 2)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         }
     }
 }
@@ -805,12 +807,16 @@ struct SessionActionButton: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
             }
-            .foregroundColor(.white)
+            .foregroundColor(.primary)
             .padding(.vertical, 12)
             .padding(.horizontal, 24)
-            .background(gradient)
+            .background(.ultraThinMaterial)
             .cornerRadius(20)
-            .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(gradient, lineWidth: 2)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         }
     }
 }
@@ -967,4 +973,4 @@ struct SessionPlayerView_Previews: PreviewProvider {
         )
         SessionPlayerView(session: dummy)
     }
-}
+} 

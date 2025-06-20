@@ -67,7 +67,6 @@ struct SettingsView: View {
         }
         .padding(.vertical, 32)
         .padding(.horizontal, 20)
-        .background(Color(.secondarySystemGroupedBackground))
     }
     
     // MARK: - Appearance Section

@@ -220,6 +220,7 @@ struct BeatSelectorView: View {
                                     icon: "music.mic",
                                     style: .primary
                                 ) {
+                                    audioManager.pause()
                                     showSessionView = true
                                 }
                             }
