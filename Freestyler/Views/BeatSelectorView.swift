@@ -1,5 +1,10 @@
 import SwiftUI
 
+struct ErrorMessage: Identifiable {
+    let id = UUID()
+    let message: String
+}
+
 let backendBaseURL = Constants.apiBaseUrl
 
 struct BeatSelectorView: View {
@@ -25,6 +30,7 @@ struct BeatSelectorView: View {
     @State private var customScaleInput = ""
     @State private var showCustomScaleDialog = false
     @State private var allBeats: [BeatModel] = []
+    @State private var errorMessage: ErrorMessage? = nil
     
     var uniqueScales: [String] {
         let scales = allBeats.map { $0.scale }
@@ -340,6 +346,9 @@ struct BeatSelectorView: View {
                 SettingsView()
             }
         }
+        .alert(item: $errorMessage) { err in
+            Alert(title: Text("Network Error"), message: Text(err.message), dismissButton: .default(Text("OK")))
+        }
         .alert("Enter Custom Scale", isPresented: $showCustomScaleDialog, actions: {
             TextField("Scale", text: $customScaleInput)
             Button("OK") {
@@ -384,12 +393,27 @@ struct BeatSelectorView: View {
     private func fetchBeats() {
         guard let url = URL(string: "\(backendBaseURL)/beats") else { return }
         URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data, error == nil else { return }
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.errorMessage = ErrorMessage(message: "Failed to fetch beats: \(error.localizedDescription)")
+                }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    self.errorMessage = ErrorMessage(message: "No data received from server.")
+                }
+                return
+            }
             if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
                 DispatchQueue.main.async {
                     allBeats = decoded
                     if let firstScale = self.uniqueScales.first { self.selectedScale = firstScale }
                     if let firstBPM = self.uniqueBPMs.first { self.selectedBPM = firstBPM }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.errorMessage = ErrorMessage(message: "Failed to decode beats from server.")
                 }
             }
         }.resume()
@@ -405,12 +429,27 @@ struct BeatSelectorView: View {
             let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
             guard let url = URL(string: urlString) else { return }
             URLSession.shared.dataTask(with: url) { data, response, error in
-                guard let data = data, error == nil else { return }
+                if let error = error {
+                    DispatchQueue.main.async {
+                        self.errorMessage = ErrorMessage(message: "Failed to fetch beats: \(error.localizedDescription)")
+                    }
+                    return
+                }
+                guard let data = data else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = ErrorMessage(message: "No data received from server.")
+                    }
+                    return
+                }
                 if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
                     DispatchQueue.main.async {
                         filteredBeats = decoded
                         selectedBeat = nil
                         audioManager.stop()
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = ErrorMessage(message: "Failed to decode beats from server.")
                     }
                 }
             }.resume()

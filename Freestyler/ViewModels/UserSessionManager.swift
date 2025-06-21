@@ -117,13 +117,23 @@ class UserSessionManager: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let error = error {
+                print("Fetch profile error: \(error)")
+                DispatchQueue.main.async { self.authError = error.localizedDescription }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async { self.authError = "No data received from server." }
+                return
+            }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 DispatchQueue.main.async {
                     self.username = json["username"] as? String
                     self.email = json["email"] as? String
                     self.profileImage = json["profileImage"] as? String
                 }
+            } else {
+                DispatchQueue.main.async { self.authError = "Failed to decode profile from server." }
             }
         }.resume()
     }
@@ -144,15 +154,23 @@ class UserSessionManager: ObservableObject {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            if let error = error {
+                print("Upload profile image error: \(error)")
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let profileImage = json["profileImage"] as? String {
                 DispatchQueue.main.async {
                     self.profileImage = profileImage
                     completion(true)
                 }
             } else {
-                completion(false)
+                DispatchQueue.main.async { completion(false) }
             }
         }.resume()
     }
