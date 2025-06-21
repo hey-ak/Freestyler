@@ -7,6 +7,7 @@ const beatRoutes = require('./routes/beatRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 const path = require('path');
+const methodOverride = require('method-override');
 
 connectDB();
 app.use(cors());
@@ -18,6 +19,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Middleware
 app.use(express.urlencoded({ extended: true })); // For form data
+app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/auth', authRoutes);

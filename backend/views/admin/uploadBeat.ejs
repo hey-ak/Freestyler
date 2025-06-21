@@ -57,6 +57,9 @@
                         <strong><%= beat.name %></strong>
                         <div class="beat-meta">Scale: <%= beat.scale %> | BPM: <%= beat.bpm %> | Category: <%= beat.category %></div>
                         <div class="beat-link">File: <a href="<%= beat.fileUrl %>" target="_blank">Listen</a></div>
+                        <form action="/admin/beats/<%= beat._id %>?_method=DELETE" method="POST" style="margin-top:10px;">
+                            <button type="submit" style="background:#ff4d4f;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;transition:background 0.2s;">Delete</button>
+                        </form>
                     </div>
                 <% }); %>
             <% } else { %>

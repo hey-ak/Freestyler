@@ -103,13 +103,15 @@ struct BeatSelectorView: View {
                             }
                             
                             FilterButton(
-                                title: "\(selectedBPM)",
+                                title: selectedBPM == 0 ? "None" : "\(selectedBPM)",
                                 icon: "metronome",
-                                isActive: true
+                                isActive: true,
+                                foregroundColor: selectedBPM == 0 ? .gray : .white
                             ) {
                                 showBPMPicker = true
                             }
                             .confirmationDialog("Select BPM", isPresented: $showBPMPicker, titleVisibility: .visible) {
+                                Button("None") { selectedBPM = 0 }
                                 ForEach(uniqueBPMs, id: \.self) { bpm in
                                     Button("\(bpm)") { selectedBPM = bpm }
                                 }
@@ -155,7 +157,7 @@ struct BeatSelectorView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                             .shadow(color: .purple.opacity(0.4), radius: 15, x: 0, y: 8)
                         }
-                        .disabled(selectedScale.isEmpty || selectedBPM == 0)
+                        .disabled(selectedScale.isEmpty)
                         .scaleEffect(filteredBeats.isEmpty ? 1.0 : 0.98)
                         .animation(.spring(response: 0.3), value: filteredBeats.isEmpty)
                     }
@@ -187,6 +189,9 @@ struct BeatSelectorView: View {
                             .padding(.vertical, 8)
                         }
                         .frame(maxHeight: 280)
+                        .refreshable {
+                            fetchBeats()
+                        }
                         
                         // Action buttons
                         if let beat = selectedBeat {
@@ -289,6 +294,11 @@ struct BeatSelectorView: View {
             }
             fetchBeats()
         }
+        .onChange(of: selectedScale) { newScale in
+            if let firstBeat = allBeats.first(where: { $0.scale == newScale }) {
+                selectedBPM = firstBeat.bpm
+            }
+        }
         .fullScreenCover(isPresented: $showSessionView, onDismiss: stopSession) {
             if let beat = selectedBeat {
                 // Safely get beatFileName
@@ -386,20 +396,25 @@ struct BeatSelectorView: View {
     }
     
     private func findBeatsFromBackend() {
-        guard !selectedScale.isEmpty, selectedBPM > 0 else { return }
-        let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
-        guard let url = URL(string: urlString) else { return }
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data, error == nil else { return }
-            if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
-                DispatchQueue.main.async {
-                    filteredBeats = decoded
-                    selectedBeat = nil
-                    audioManager.stop()
+        guard !selectedScale.isEmpty else { return }
+        if selectedBPM == 0 {
+            // Show all beats for the selected scale
+            filteredBeats = allBeats.filter { $0.scale == selectedScale }
+        } else {
+            let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
+            guard let url = URL(string: urlString) else { return }
+            URLSession.shared.dataTask(with: url) { data, response, error in
+                guard let data = data, error == nil else { return }
+                if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
+                    DispatchQueue.main.async {
+                        filteredBeats = decoded
+                        selectedBeat = nil
+                        audioManager.stop()
+                    }
                 }
-            }
-        }.resume()
+            }.resume()
+        }
     }
 }
 
@@ -409,7 +424,16 @@ struct FilterButton: View {
     let title: String
     let icon: String
     let isActive: Bool
+    let foregroundColor: Color?
     let action: () -> Void
+    
+    init(title: String, icon: String, isActive: Bool, foregroundColor: Color? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.isActive = isActive
+        self.foregroundColor = foregroundColor
+        self.action = action
+    }
     
     var body: some View {
         Button(action: action) {
@@ -420,7 +444,7 @@ struct FilterButton: View {
                     .font(.system(size: 16, weight: .medium))
                     .lineLimit(1)
             }
-            .foregroundColor(isActive ? .white : .primary)
+            .foregroundColor(foregroundColor ?? (isActive ? .white : .primary))
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(

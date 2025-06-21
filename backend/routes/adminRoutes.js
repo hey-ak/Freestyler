@@ -86,4 +86,26 @@ router.post('/beats', upload.single('beatFile'), async (req, res) => {
     }
 });
 
+// DELETE: Delete a beat by ID
+router.delete('/beats/:id', async (req, res) => {
+    try {
+        const beat = await Beat.findById(req.params.id);
+        if (!beat) {
+            return res.status(404).send('Beat not found');
+        }
+        // Remove the file from the filesystem
+        if (beat.fileUrl) {
+            const filePath = path.join(__dirname, '../public', beat.fileUrl);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+        await Beat.findByIdAndDelete(req.params.id);
+        res.redirect('/admin/beats');
+    } catch (err) {
+        console.error('[ADMIN][DELETE /beats/:id] Error deleting beat:', err);
+        res.status(500).send('Error deleting beat.');
+    }
+});
+
 module.exports = router; 
