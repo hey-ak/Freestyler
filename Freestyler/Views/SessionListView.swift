@@ -279,7 +279,7 @@ struct SessionListView: View {
                     } else {
                         // Sessions list
                         List {
-                            ForEach(store.sessions) { session in
+                            ForEach(store.sessions.reversed()) { session in
                                 Button(action: {
                                     selectedSession = session
                                     showSessionPlayer = true
