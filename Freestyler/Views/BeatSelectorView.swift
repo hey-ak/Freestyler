@@ -1,6 +1,6 @@
 import SwiftUI
 
-let backendBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app" // <-- Replace with your actual ngrok HTTPS URL
+let backendBaseURL = Constants.apiBaseUrl
 
 struct BeatSelectorView: View {
     @State private var selectedScale: String = ""

@@ -335,6 +335,7 @@ struct SessionPlayerView: View {
         if isPlaying {
             pause()
         }
+        metronomeManager.stop()
     }
     
     private func resumeRecording() {
@@ -343,6 +344,9 @@ struct SessionPlayerView: View {
         if !isPlaying {
             play()
         }
+        if metronomeOn {
+            metronomeManager.start(bpm: settings.metronomeBPM)
+        }
     }
     
     private func stopRecording() {
@@ -350,6 +354,7 @@ struct SessionPlayerView: View {
         isRecordingPaused = false
         hasUnsavedRecording = true
         stop()
+        metronomeManager.stop()
     }
     
     private func saveRecording() {

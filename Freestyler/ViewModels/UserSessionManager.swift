@@ -11,7 +11,7 @@ class UserSessionManager: ObservableObject {
     
     private let keychainService = "com.freestyler.auth"
     private let tokenKey = "jwtToken"
-    let apiBaseURL = "https://de14-2405-201-5000-2042-8c5d-ebb9-ded9-25b5.ngrok-free.app"
+    let apiBaseURL = Constants.apiBaseUrl
     
     var jwtToken: String? {
         get { loadTokenFromKeychain() }
