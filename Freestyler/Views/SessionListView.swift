@@ -315,20 +315,23 @@ struct SessionListView: View {
                                 Button(role: .destructive) {
                                     showDeleteAllAlert = true
                                 } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "trash.fill")
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "trash")
                                             .font(.system(size: 16, weight: .medium))
                                         Text("Delete All Sessions")
                                             .font(.body.weight(.medium))
                                     }
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.red)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 50)
-                                    .background(Color.red)
-                                    .cornerRadius(12)
+                                    .frame(height: 44)
+                                    .background(Color.clear)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.red.opacity(0.7), lineWidth: 1.2)
+                                    )
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 16)
+                                .padding(.horizontal, 32)
+                                .padding(.bottom, 18)
                             }
                             .background(Color(.systemGroupedBackground))
                         }

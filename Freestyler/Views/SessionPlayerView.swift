@@ -587,6 +587,7 @@ struct SessionPlayerView: View {
     }
 
     private func stopMetronome() {
+        metronomeManager.stop()
         metronomePlayer?.stop()
         metronomePlayer = nil
     }

@@ -425,10 +425,10 @@ struct BeatSelectorView: View {
             // Show all beats for the selected scale
             filteredBeats = allBeats.filter { $0.scale == selectedScale }
         } else {
-            let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
-            guard let url = URL(string: urlString) else { return }
-            URLSession.shared.dataTask(with: url) { data, response, error in
+        let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
+        guard let url = URL(string: urlString) else { return }
+        URLSession.shared.dataTask(with: url) { data, response, error in
                 if let error = error {
                     DispatchQueue.main.async {
                         self.errorMessage = ErrorMessage(message: "Failed to fetch beats: \(error.localizedDescription)")
@@ -441,18 +441,18 @@ struct BeatSelectorView: View {
                     }
                     return
                 }
-                if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
-                    DispatchQueue.main.async {
-                        filteredBeats = decoded
-                        selectedBeat = nil
-                        audioManager.stop()
-                    }
+            if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
+                DispatchQueue.main.async {
+                    filteredBeats = decoded
+                    selectedBeat = nil
+                    audioManager.stop()
+                }
                 } else {
                     DispatchQueue.main.async {
                         self.errorMessage = ErrorMessage(message: "Failed to decode beats from server.")
                     }
-                }
-            }.resume()
+            }
+        }.resume()
         }
     }
 }
