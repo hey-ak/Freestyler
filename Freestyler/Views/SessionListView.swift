@@ -288,7 +288,7 @@ struct SessionListView: View {
                                         .padding(.horizontal, 8)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .listRowBackground(Color(.systemBackground))
+                                .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                                 .contextMenu {
@@ -304,6 +304,7 @@ struct SessionListView: View {
                         }
                         .listStyle(PlainListStyle())
                         .scrollContentBackground(.hidden)
+                        .background(Color.clear)
                         
                         // Delete all button
                         if !store.sessions.isEmpty {
@@ -423,7 +424,7 @@ struct SessionRowView: View {
         .padding(.horizontal, 14)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(Color.clear)
                 .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 4)
         )
         .overlay(
