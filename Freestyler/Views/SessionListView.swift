@@ -280,27 +280,22 @@ struct SessionListView: View {
                         // Sessions list
                         List {
                             ForEach(store.sessions.reversed()) { session in
-                                Button(action: {
-                                    selectedSession = session
-                                    showSessionPlayer = true
-                                }) {
-                                    SessionRowView(session: session)
-                                        .padding(.horizontal, 8)
-                                }
-                                .buttonStyle(PlainButtonStyle())
+                                SessionRow(
+                                    session: session,
+                                    onDelete: { store.deleteSession(at: IndexSet(integer: store.sessions.firstIndex(where: { $0.id == session.id })!)) },
+                                    onRename: {
+                                        renamingSession = session
+                                        newName = session.displayName ?? session.beatName
+                                    },
+                                    onSelect: {
+                                        selectedSession = session
+                                        showSessionPlayer = true
+                                    }
+                                )
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                                .contextMenu {
-                                    Button {
-                                        renamingSession = session
-                                        newName = session.displayName ?? session.beatName
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
-                                }
                             }
-                            .onDelete(perform: store.deleteSession)
                         }
                         .listStyle(PlainListStyle())
                         .scrollContentBackground(.hidden)
@@ -359,6 +354,34 @@ struct SessionListView: View {
         }
         .sheet(item: $selectedSession) { session in
             SessionAudioPlayerView(session: session)
+        }
+    }
+}
+
+struct SessionRow: View {
+    let session: SessionModel
+    let onDelete: () -> Void
+    let onRename: () -> Void
+    let onSelect: () -> Void
+    @State private var showRename = false
+    var body: some View {
+        Button(action: onSelect) {
+            SessionRowView(session: session)
+                .padding(.horizontal, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            Button(action: onRename) {
+                Label("Rename", systemImage: "pencil")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 }
