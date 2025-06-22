@@ -758,13 +758,29 @@ struct MainRecordingButton: View {
     
     var body: some View {
         Button(action: onAction) {
-            Image(systemName: buttonIcon)
-                .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 80, height: 80)
-                .background(buttonGradient)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+            if isRecording || isPaused {
+                // Stop button: match SecondaryActionButton style
+                Image(systemName: buttonIcon)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.primary)
+                    .frame(width: 50, height: 50)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(buttonGradient, lineWidth: 2)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            } else {
+                // Mic button: keep large, prominent style
+                Image(systemName: buttonIcon)
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 80, height: 80)
+                    .background(buttonGradient)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+            }
         }
         .scaleEffect(isRecording ? 1.08 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isRecording)
