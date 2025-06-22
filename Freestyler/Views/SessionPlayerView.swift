@@ -773,13 +773,13 @@ struct MainRecordingButton: View {
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
             } else {
                 // Mic button: keep large, prominent style
-                Image(systemName: buttonIcon)
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 80, height: 80)
-                    .background(buttonGradient)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+            Image(systemName: buttonIcon)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 80, height: 80)
+                .background(buttonGradient)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
             }
         }
         .scaleEffect(isRecording ? 1.08 : 1.0)

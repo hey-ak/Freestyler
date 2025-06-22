@@ -48,6 +48,13 @@ class UserSessionManager: ObservableObject {
             }
             if let httpResponse = response as? HTTPURLResponse {
                 print("Login HTTP status: \(httpResponse.statusCode)")
+                if httpResponse.statusCode == 400, let data = data {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let backendError = json["error"] as? String, backendError == "Invalid credentials" {
+                        DispatchQueue.main.async { self.authError = "Incorrect email or password." }
+                        return
+                    }
+                }
             }
             if let data = data {
                 print("Login raw response: ", String(data: data, encoding: .utf8) ?? "<nil>")
