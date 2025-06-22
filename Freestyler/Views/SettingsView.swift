@@ -1,5 +1,56 @@
 import SwiftUI
 import PhotosUI
+import Combine
+
+// MARK: - Custom Image Cache
+class ImageCache {
+    static let shared = ImageCache()
+    private let cache = NSCache<NSString, UIImage>()
+    private init() {}
+    func image(forKey key: String) -> UIImage? {
+        cache.object(forKey: key as NSString)
+    }
+    func setImage(_ image: UIImage, forKey key: String) {
+        cache.setObject(image, forKey: key as NSString)
+    }
+}
+
+struct CachedAsyncImage: View {
+    let url: URL?
+    let placeholder: () -> AnyView
+    let image: (Image) -> AnyView
+    @State private var loadedImage: UIImage?
+    @State private var cancellable: AnyCancellable?
+
+    var body: some View {
+        Group {
+            if let loadedImage = loadedImage {
+                image(Image(uiImage: loadedImage))
+            } else {
+                placeholder()
+                    .onAppear(perform: load)
+            }
+        }
+    }
+
+    private func load() {
+        guard let url = url else { return }
+        if let cached = ImageCache.shared.image(forKey: url.absoluteString) {
+            loadedImage = cached
+            return
+        }
+        cancellable = URLSession.shared.dataTaskPublisher(for: url)
+            .map { UIImage(data: $0.data) }
+            .replaceError(with: nil)
+            .receive(on: DispatchQueue.main)
+            .sink { image in
+                if let image = image {
+                    ImageCache.shared.setImage(image, forKey: url.absoluteString)
+                    loadedImage = image
+                }
+            }
+    }
+}
 
 struct SettingsView: View {
     @ObservedObject var settings = SettingsModel.shared
@@ -70,25 +121,11 @@ struct SettingsView: View {
                     )
                     .frame(width: 100, height: 100)
                 if let imageUrl = sessionManager.profileImage, let url = URL(string: imageUrl, relativeTo: URL(string: sessionManager.apiBaseURL)) {
-                    AsyncImage(url: url) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 90, height: 90)
-                                .clipShape(Circle())
-                        } else if phase.error != nil {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 90, height: 90)
-                                .clipShape(Circle())
-                                .foregroundColor(.white)
-                        } else {
-                            ProgressView()
-                                .frame(width: 90, height: 90)
-                        }
-                    }
+                    CachedAsyncImage(
+                        url: url,
+                        placeholder: { AnyView(ProgressView().frame(width: 90, height: 90)) },
+                        image: { img in AnyView(img.resizable().scaledToFill().frame(width: 90, height: 90).clipShape(Circle())) }
+                    )
                     .id(sessionManager.profileImage ?? "")
                 } else {
                     Image(systemName: "person.crop.circle.fill")
