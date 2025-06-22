@@ -95,13 +95,18 @@ struct BeatSelectorView: View {
                     VStack(spacing: 16) {
                         HStack(spacing: 16) {
                             FilterButton(
-                                title: selectedScale,
+                                title: selectedScale.isEmpty ? "All" : selectedScale,
                                 icon: "music.note",
-                                isActive: true
+                                isActive: true,
+                                foregroundColor: .white
                             ) {
                                 showScalePicker = true
                             }
                             .confirmationDialog("Select Scale", isPresented: $showScalePicker, titleVisibility: .visible) {
+                                Button("All") {
+                                    selectedScale = ""
+                                    selectedBPM = 0
+                                }
                                 ForEach(uniqueScales, id: \.self) { scale in
                                     Button(scale) { selectedScale = scale }
                                 }
@@ -109,15 +114,15 @@ struct BeatSelectorView: View {
                             }
                             
                             FilterButton(
-                                title: selectedBPM == 0 ? "None" : "\(selectedBPM)",
+                                title: selectedBPM == 0 ? "Any" : "\(selectedBPM)",
                                 icon: "metronome",
                                 isActive: true,
-                                foregroundColor: selectedBPM == 0 ? .gray : .white
+                                foregroundColor: .white
                             ) {
                                 showBPMPicker = true
                             }
                             .confirmationDialog("Select BPM", isPresented: $showBPMPicker, titleVisibility: .visible) {
-                                Button("None") { selectedBPM = 0 }
+                                Button("Any") { selectedBPM = 0 }
                                 ForEach(uniqueBPMs, id: \.self) { bpm in
                                     Button("\(bpm)") { selectedBPM = bpm }
                                 }
@@ -163,7 +168,7 @@ struct BeatSelectorView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                             .shadow(color: .purple.opacity(0.4), radius: 15, x: 0, y: 8)
                         }
-                        .disabled(selectedScale.isEmpty)
+                        .disabled(allBeats.isEmpty)
                         .scaleEffect(filteredBeats.isEmpty ? 1.0 : 0.98)
                         .animation(.spring(response: 0.3), value: filteredBeats.isEmpty)
                     }
@@ -301,7 +306,9 @@ struct BeatSelectorView: View {
             fetchBeats()
         }
         .onChange(of: selectedScale) { newScale in
-            if let firstBeat = allBeats.first(where: { $0.scale == newScale }) {
+            if newScale.isEmpty {
+                selectedBPM = 0
+            } else if let firstBeat = allBeats.first(where: { $0.scale == newScale }) {
                 selectedBPM = firstBeat.bpm
             }
         }
@@ -420,15 +427,22 @@ struct BeatSelectorView: View {
     }
     
     private func findBeatsFromBackend() {
-        guard !selectedScale.isEmpty else { return }
-        if selectedBPM == 0 {
+        if selectedScale.isEmpty {
+            if selectedBPM == 0 {
+                // Show all beats
+                filteredBeats = allBeats
+            } else {
+                // Show all beats with the selected BPM, regardless of scale
+                filteredBeats = allBeats.filter { $0.bpm == selectedBPM }
+            }
+        } else if selectedBPM == 0 {
             // Show all beats for the selected scale
             filteredBeats = allBeats.filter { $0.scale == selectedScale }
         } else {
-        let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
-        guard let url = URL(string: urlString) else { return }
-        URLSession.shared.dataTask(with: url) { data, response, error in
+            let scaleParam = selectedScale.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            let urlString = "\(backendBaseURL)/beats?scale=\(scaleParam)&bpm=\(selectedBPM)"
+            guard let url = URL(string: urlString) else { return }
+            URLSession.shared.dataTask(with: url) { data, response, error in
                 if let error = error {
                     DispatchQueue.main.async {
                         self.errorMessage = ErrorMessage(message: "Failed to fetch beats: \(error.localizedDescription)")
@@ -441,18 +455,18 @@ struct BeatSelectorView: View {
                     }
                     return
                 }
-            if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
-                DispatchQueue.main.async {
-                    filteredBeats = decoded
-                    selectedBeat = nil
-                    audioManager.stop()
-                }
+                if let decoded = try? JSONDecoder().decode([BeatModel].self, from: data) {
+                    DispatchQueue.main.async {
+                        filteredBeats = decoded
+                        selectedBeat = nil
+                        audioManager.stop()
+                    }
                 } else {
                     DispatchQueue.main.async {
                         self.errorMessage = ErrorMessage(message: "Failed to decode beats from server.")
                     }
-            }
-        }.resume()
+                }
+            }.resume()
         }
     }
 }
@@ -463,10 +477,10 @@ struct FilterButton: View {
     let title: String
     let icon: String
     let isActive: Bool
-    let foregroundColor: Color?
+    let foregroundColor: Color
     let action: () -> Void
     
-    init(title: String, icon: String, isActive: Bool, foregroundColor: Color? = nil, action: @escaping () -> Void) {
+    init(title: String, icon: String, isActive: Bool, foregroundColor: Color, action: @escaping () -> Void) {
         self.title = title
         self.icon = icon
         self.isActive = isActive
@@ -483,7 +497,7 @@ struct FilterButton: View {
                     .font(.system(size: 16, weight: .medium))
                     .lineLimit(1)
             }
-            .foregroundColor(foregroundColor ?? (isActive ? .white : .primary))
+            .foregroundColor(foregroundColor)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(
