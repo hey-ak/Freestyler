@@ -38,12 +38,12 @@ class UserSessionManager: ObservableObject {
         let body = ["email": email, "password": password]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                self.isLoading = false
-            }
             if let error = error {
                 print("Login error: \(error)")
-                DispatchQueue.main.async { self.authError = error.localizedDescription }
+                DispatchQueue.main.async {
+                    self.authError = error.localizedDescription
+                    self.isLoading = false
+                }
                 return
             }
             if let httpResponse = response as? HTTPURLResponse {
@@ -51,7 +51,10 @@ class UserSessionManager: ObservableObject {
                 if httpResponse.statusCode == 400, let data = data {
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let backendError = json["error"] as? String, backendError == "Invalid credentials" {
-                        DispatchQueue.main.async { self.authError = "Incorrect email or password." }
+                        DispatchQueue.main.async {
+                            self.authError = "Incorrect email or password."
+                            self.isLoading = false
+                        }
                         return
                     }
                 }
@@ -62,13 +65,19 @@ class UserSessionManager: ObservableObject {
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let token = json["token"] as? String else {
-                DispatchQueue.main.async { self.authError = "Invalid response from server." }
+                DispatchQueue.main.async {
+                    self.authError = "Invalid response from server."
+                    self.isLoading = false
+                }
                 return
             }
             self.jwtToken = token
             self.username = json["username"] as? String
             self.email = json["email"] as? String
-            DispatchQueue.main.async { self.isAuthenticated = true }
+            DispatchQueue.main.async {
+                self.isAuthenticated = true
+                self.isLoading = false
+            }
         }.resume()
     }
     
