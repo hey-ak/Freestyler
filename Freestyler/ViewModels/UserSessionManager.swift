@@ -77,6 +77,7 @@ class UserSessionManager: ObservableObject {
             DispatchQueue.main.async {
                 self.isAuthenticated = true
                 self.isLoading = false
+                self.fetchProfile()
             }
         }.resume()
     }
@@ -114,7 +115,10 @@ class UserSessionManager: ObservableObject {
             self.jwtToken = token
             self.username = json["username"] as? String
             self.email = json["email"] as? String
-            DispatchQueue.main.async { self.isAuthenticated = true }
+            DispatchQueue.main.async {
+                self.isAuthenticated = true
+                self.fetchProfile()
+            }
         }.resume()
     }
     
