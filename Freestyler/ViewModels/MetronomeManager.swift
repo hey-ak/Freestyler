@@ -29,7 +29,9 @@ class MetronomeManager: ObservableObject {
         stop()
         let bpmToUse = bpm ?? settings.metronomeBPM
         let interval = 60.0 / Double(bpmToUse)
-        isTicking = true
+        DispatchQueue.main.async {
+            self.isTicking = true
+        }
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.playClick()
             self?.onTick?()
@@ -42,7 +44,9 @@ class MetronomeManager: ObservableObject {
     func stop() {
         timer?.invalidate()
         timer = nil
-        isTicking = false
+        DispatchQueue.main.async {
+            self.isTicking = false
+        }
     }
     
     private func playClick() {

@@ -111,10 +111,11 @@ class RecordingManager: ObservableObject {
             audioRecorder?.isMeteringEnabled = true
             audioRecorder?.record()
             
-            isRecording = true
-            isPaused = false
-            recordedFileURL = audioURL
-            
+            DispatchQueue.main.async {
+                self.isRecording = true
+                self.isPaused = false
+                self.recordedFileURL = audioURL
+            }
             startLevelMonitoring()
             
         } catch {
@@ -124,20 +125,26 @@ class RecordingManager: ObservableObject {
     
     func pauseRecording() {
         audioRecorder?.pause()
-        isPaused = true
+        DispatchQueue.main.async {
+            self.isPaused = true
+        }
         stopLevelMonitoring()
     }
     
     func resumeRecording() {
         audioRecorder?.record()
-        isPaused = false
+        DispatchQueue.main.async {
+            self.isPaused = false
+        }
         startLevelMonitoring()
     }
     
     func stopRecording() {
         audioRecorder?.stop()
-        isRecording = false
-        isPaused = false
+        DispatchQueue.main.async {
+            self.isRecording = false
+            self.isPaused = false
+        }
         stopLevelMonitoring()
     }
     
@@ -156,6 +163,8 @@ class RecordingManager: ObservableObject {
     private func stopLevelMonitoring() {
         levelTimer?.invalidate()
         levelTimer = nil
-        recordingLevel = 0.0
+        DispatchQueue.main.async {
+            self.recordingLevel = 0.0
+        }
     }
 }

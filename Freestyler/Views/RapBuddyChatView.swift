@@ -5,6 +5,7 @@ import struct Freestyler.Constants
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    @Namespace private var bubbleNamespace
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 12) {
@@ -12,29 +13,28 @@ struct ChatBubbleView: View {
                 Spacer(minLength: 80)
                 messageContent
             } else {
-                // AI Avatar - More professional design
                 Circle()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.2, green: 0.4, blue: 0.9),
-                            Color(red: 0.1, green: 0.3, blue: 0.8)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 36, height: 36)
                     .overlay(
                         Image(systemName: "music.note")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                     )
-                    .shadow(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
                 
                 messageContent
                 Spacer(minLength: 80)
             }
         }
         .padding(.horizontal, 20)
+        .matchedGeometryEffect(id: message.id, in: bubbleNamespace)
     }
     
     private var messageContent: some View {
@@ -42,17 +42,14 @@ struct ChatBubbleView: View {
             Text(message.text)
                 .font(.system(size: 16, weight: .regular, design: .default))
                 .lineSpacing(2)
-                .foregroundColor(message.isUser ? .white : Color(.label))
+                .foregroundColor(message.isUser ? .white : .primary)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .background(
                     Group {
                         if message.isUser {
                             LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.2, green: 0.4, blue: 0.9),
-                                    Color(red: 0.3, green: 0.2, blue: 0.8)
-                                ]),
+                                colors: [.purple, .blue],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -67,9 +64,7 @@ struct ChatBubbleView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 22))
                 .shadow(
-                    color: message.isUser
-                        ? Color(red: 0.2, green: 0.4, blue: 0.9).opacity(0.2)
-                        : Color.black.opacity(0.06),
+                    color: message.isUser ? .purple.opacity(0.2) : .black.opacity(0.06),
                     radius: message.isUser ? 12 : 8,
                     x: 0,
                     y: message.isUser ? 6 : 3
@@ -180,109 +175,180 @@ struct ChatInputBar: View {
     }
 }
 
+// MARK: - Chat Header
+struct ChatHeaderView: View {
+    var isLoading: Bool
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                    )
+                    .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Rap Buddy")
+                        .font(.system(size: 20, weight: .semibold, design: .default))
+                        .foregroundColor(.primary)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isLoading ? Color.orange : Color.green)
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(isLoading ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isLoading)
+                        Text(isLoading ? "Thinking..." : "Online")
+                            .font(.system(size: 14, weight: .medium, design: .default))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                Color(.systemBackground)
+                    .shadow(color: .black.opacity(0.02), radius: 1, x: 0, y: 1)
+            )
+            Rectangle()
+                .fill(LinearGradient(
+                    colors: [Color(.separator).opacity(0.3), Color(.separator).opacity(0.1)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .frame(height: 1)
+        }
+    }
+}
+
+// MARK: - Chat Messages List
+struct ChatMessagesListView: View {
+    let messages: [ChatMessage]
+    let isLoading: Bool
+    @Namespace private var bubbleNamespace
+    @State private var lastMessageId: UUID? = nil
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 20) {
+                        ForEach(messages) { message in
+                            ChatBubbleView(message: message)
+                                .id(message.id)
+                                .matchedGeometryEffect(id: message.id, in: bubbleNamespace)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: message.isUser ? .trailing : .leading)
+                                        .combined(with: .opacity)
+                                        .combined(with: .scale(scale: 0.95)),
+                                    removal: .opacity.combined(with: .scale(scale: 0.95))
+                                ))
+                        }
+                        if isLoading {
+                            ChatLoadingIndicator()
+                                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        }
+                    }
+                    .padding(.vertical, 24)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: messages)
+                    .onChange(of: messages) { newMessages in
+                        if let last = newMessages.last?.id {
+                            withAnimation(.easeOut(duration: 0.6)) {
+                                proxy.scrollTo(last, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onAppear {
+                        if let last = messages.last?.id {
+                            proxy.scrollTo(last, anchor: .bottom)
+                        }
+                    }
+                }
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color(.systemGroupedBackground),
+                            Color(.systemBackground)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Chat Loading Indicator
+struct ChatLoadingIndicator: View {
+    @State private var animate = false
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.purple, .blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Image(systemName: "music.note")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                )
+                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+            HStack(spacing: 6) {
+                ForEach(0..<3) { index in
+                    Circle()
+                        .fill(Color(.tertiaryLabel))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(animate ? 1.2 : 0.8)
+                        .opacity(animate ? 0.8 : 0.4)
+                        .animation(
+                            .easeInOut(duration: 0.8)
+                                .repeatForever()
+                                .delay(Double(index) * 0.15),
+                            value: animate
+                        )
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
+            Spacer(minLength: 80)
+        }
+        .padding(.horizontal, 20)
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        .onAppear { animate = true }
+        .onDisappear { animate = false }
+    }
+}
+
 struct RapBuddyChatView: View {
     @StateObject private var viewModel = RapBuddyChatViewModel.shared
     @FocusState private var isInputFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
-            // Professional header
-            headerView
-            
-            // Enhanced chat messages area
-            GeometryReader { geometry in
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 20) {
-                            ForEach(viewModel.messages) { message in
-                                ChatBubbleView(message: message)
-                                    .id(message.id)
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: message.isUser ? .trailing : .leading)
-                                            .combined(with: .opacity)
-                                            .combined(with: .scale(scale: 0.95)),
-                                        removal: .opacity.combined(with: .scale(scale: 0.95))
-                                    ))
-                            }
-                            
-                            // Enhanced loading indicator
-                            if viewModel.isLoading {
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(LinearGradient(
-                                            gradient: Gradient(colors: [
-                                                Color(red: 0.2, green: 0.4, blue: 0.9),
-                                                Color(red: 0.1, green: 0.3, blue: 0.8)
-                                            ]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ))
-                                        .frame(width: 36, height: 36)
-                                        .overlay(
-                                            Image(systemName: "music.note")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.white)
-                                        )
-                                        .shadow(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.3), radius: 8, x: 0, y: 4)
-                                    
-                                    HStack(spacing: 6) {
-                                        ForEach(0..<3) { index in
-                                            Circle()
-                                                .fill(Color(.tertiaryLabel))
-                                                .frame(width: 8, height: 8)
-                                                .scaleEffect(viewModel.isLoading ? 1.2 : 0.8)
-                                                .opacity(viewModel.isLoading ? 0.8 : 0.4)
-                                                .animation(
-                                                    .easeInOut(duration: 0.8)
-                                                        .repeatForever()
-                                                        .delay(Double(index) * 0.15),
-                                                    value: viewModel.isLoading
-                                                )
-                                        }
-                                    }
-                                    .padding(.horizontal, 18)
-                                    .padding(.vertical, 14)
-                                    .background(Color(.secondarySystemGroupedBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 22))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 22)
-                                            .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 1)
-                                    )
-                                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
-                                        
-                                    Spacer(minLength: 80)
-                                }
-                                .padding(.horizontal, 20)
-                                .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                            }
-                        }
-                        .padding(.vertical, 24)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.messages.count)
-                    }
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(.systemGroupedBackground),
-                                Color(.systemBackground)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .onChange(of: viewModel.messages.count) { _ in
-                        withAnimation(.easeOut(duration: 0.6)) {
-                            proxy.scrollTo(viewModel.messages.last?.id, anchor: .bottom)
-                        }
-                    }
-                    .onChange(of: viewModel.isLoading) { _ in
-                        withAnimation(.easeOut(duration: 0.4)) {
-                            proxy.scrollTo(viewModel.messages.last?.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-            
-            // Input bar
+            ChatHeaderView(isLoading: viewModel.isLoading)
+            ChatMessagesListView(messages: viewModel.messages, isLoading: viewModel.isLoading)
             ChatInputBar(
                 inputText: $viewModel.inputText,
                 isLoading: viewModel.isLoading,
@@ -290,6 +356,18 @@ struct RapBuddyChatView: View {
                 isInputFocused: $isInputFocused
             )
         }
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(.systemBackground),
+                    Color.purple.opacity(0.02),
+                    Color.blue.opacity(0.02)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .navigationTitle("Rap Buddy")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.systemBackground), for: .navigationBar)
@@ -302,67 +380,6 @@ struct RapBuddyChatView: View {
                 message: Text(viewModel.errorMessage ?? "Unable to reach Rap Buddy. Please try again."),
                 dismissButton: .default(Text("OK"))
             )
-        }
-    }
-    
-    private var headerView: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                // Enhanced AI avatar in header
-                Circle()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.2, green: 0.4, blue: 0.9),
-                            Color(red: 0.1, green: 0.3, blue: 0.8)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 44, height: 44)
-                    .overlay(
-                        Image(systemName: "music.note")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
-                    )
-                    .shadow(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.3), radius: 8, x: 0, y: 4)
-                
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Rap Buddy")
-                        .font(.system(size: 20, weight: .semibold, design: .default))
-                        .foregroundColor(Color(.label))
-                    
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(viewModel.isLoading ? Color.orange : Color.green)
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(viewModel.isLoading ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: viewModel.isLoading)
-                        
-                        Text(viewModel.isLoading ? "Thinking..." : "Online")
-                            .font(.system(size: 14, weight: .medium, design: .default))
-                            .foregroundColor(Color(.secondaryLabel))
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                Color(.systemBackground)
-                    .shadow(color: .black.opacity(0.02), radius: 1, x: 0, y: 1)
-            )
-            
-            Rectangle()
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.separator).opacity(0.3),
-                        Color(.separator).opacity(0.1)
-                    ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ))
-                .frame(height: 1)
         }
     }
     
@@ -394,11 +411,13 @@ struct RapBuddyChatView: View {
             return
         }
         
-        let messagesForAPI = viewModel.messages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.text] }
+        let maxHistory = 8
+        let recentMessages = viewModel.messages.suffix(maxHistory)
+        let messagesForAPI = recentMessages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.text] }
         let body: [String: Any] = [
             "model": "deepseek/deepseek-r1-0528:free",
             "messages": messagesForAPI,
-            "max_tokens": 256,
+            "max_tokens": 768,
             "temperature": 0.8
         ]
         
@@ -419,10 +438,18 @@ struct RapBuddyChatView: View {
                     return
                 }
                 
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 500 {
+                    self.viewModel.errorMessage = "Sorry, the server is busy or encountered an error. Please try again in a moment."
+                    self.viewModel.isLoading = false
+                    return
+                }
+                
                 guard let data = data else {
                     self.viewModel.errorMessage = "No response received from server."
                     return
                 }
+                
+                print("API raw response: ", String(data: data, encoding: .utf8) ?? "<nil>")
                 
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -430,7 +457,15 @@ struct RapBuddyChatView: View {
                        let message = choices.first?["message"] as? [String: Any],
                        let content = message["content"] as? String {
                         
-                        let responseMessage = ChatMessage(text: content.trimmingCharacters(in: .whitespacesAndNewlines), isUser: false)
+                        let rawContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let summarizedContent: String
+                        if rawContent.count > 500 {
+                            let index = rawContent.index(rawContent.startIndex, offsetBy: 500)
+                            summarizedContent = String(rawContent[..<index]) + "..."
+                        } else {
+                            summarizedContent = rawContent
+                        }
+                        let responseMessage = ChatMessage(text: summarizedContent, isUser: false)
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             self.viewModel.messages.append(responseMessage)
                         }

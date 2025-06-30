@@ -26,11 +26,13 @@ class RapBuddyChatViewModel: ObservableObject {
     private init() {}
     
     func reset() {
-        messages = [
-            ChatMessage(text: "Hey! I'm your Rap Buddy. Ask me anything about rapping, lyrics, flow, or even get feedback on your bars!", isUser: false)
-        ]
-        inputText = ""
-        isLoading = false
-        errorMessage = nil
+        DispatchQueue.main.async {
+            self.messages = [
+                ChatMessage(text: "Hey! I'm your Rap Buddy. Ask me anything about rapping, lyrics, flow, or even get feedback on your bars!", isUser: false)
+            ]
+            self.inputText = ""
+            self.isLoading = false
+            self.errorMessage = nil
+        }
     }
 } 

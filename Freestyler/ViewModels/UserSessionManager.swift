@@ -197,10 +197,14 @@ class UserSessionManager: ObservableObject {
     
     func autoLogin() {
         if let token = loadTokenFromKeychain(), !token.isEmpty {
-            isAuthenticated = true
+            DispatchQueue.main.async {
+                self.isAuthenticated = true
+            }
             fetchProfile()
         } else {
-            isAuthenticated = false
+            DispatchQueue.main.async {
+                self.isAuthenticated = false
+            }
         }
     }
     

@@ -12,7 +12,9 @@ class AudioManager: ObservableObject {
             // Remote file: use AVPlayer
             avPlayer = AVPlayer(url: url)
             avPlayer?.play()
-            isPlaying = true
+            DispatchQueue.main.async {
+                self.isPlaying = true
+            }
         } else {
             // Local file: use AVAudioPlayer
             let url: URL
@@ -24,10 +26,14 @@ class AudioManager: ObservableObject {
             do {
                 audioPlayer = try AVAudioPlayer(contentsOf: url)
                 audioPlayer?.play()
-                isPlaying = true
+                DispatchQueue.main.async {
+                    self.isPlaying = true
+                }
             } catch {
                 print("Failed to set up players: \(error)")
-                isPlaying = false
+                DispatchQueue.main.async {
+                    self.isPlaying = false
+                }
             }
         }
     }
@@ -35,12 +41,16 @@ class AudioManager: ObservableObject {
     func pause() {
         audioPlayer?.pause()
         avPlayer?.pause()
-        isPlaying = false
+        DispatchQueue.main.async {
+            self.isPlaying = false
+        }
     }
 
     func stop() {
         audioPlayer?.stop()
         avPlayer?.pause()
-        isPlaying = false
+        DispatchQueue.main.async {
+            self.isPlaying = false
+        }
     }
 } 
