@@ -12,8 +12,12 @@ A modern full-stack freestyle music creation app with a SwiftUI iOS frontend and
 - ⚙️ **Settings**: Dark mode, metronome, and countdown customization.
 - 💎 **Modern UI/UX**: Glassmorphism, gradients, and smooth controls for a premium feel.
 
-## Screenshots
-<!-- Add screenshots here -->
+## Read More About
+https://www.linkedin.com/posts/akshay0127_freestyler-iosapp-musicapp-activity-7342590621808848896-jDGa?utm_source=share&utm_medium=member_desktop&rcm=ACoAADsoppEBiCYa7WcZUdAK_zXjHupKMQPY-I8
+
+## Demo Video Link for Freestyler App
+https://drive.google.com/file/d/1VWhJadHPi0CFifQz9D38wQFkb2rTmiEZ/view?usp=sharing
+
 
 ## Getting Started
 
